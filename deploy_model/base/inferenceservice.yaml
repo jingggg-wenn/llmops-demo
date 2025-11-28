@@ -4,7 +4,7 @@ metadata:
   annotations:
     openshift.io/display-name: qwen2.5-0.5b-instruct
     serving.kserve.io/deploymentMode: RawDeployment
-  name: qwen2.5-0.5b-instruct
+  name: qwen25-05b-instruct
   labels:
     opendatahub.io/dashboard: 'true'
     networking.kserve.io/visibility: exposed
@@ -25,7 +25,7 @@ spec:
           cpu: '1'
           memory: 4Gi
           nvidia.com/gpu: '1'
-      runtime: qwen2.5-0.5b-instruct
+      runtime: qwen25-05b-instruct
       storageUri: 'oci://quay.io/redhat-ai-services/modelcar-catalog:qwen2.5-0.5b-instruct'
     containerConcurrency: 1
     tolerations:

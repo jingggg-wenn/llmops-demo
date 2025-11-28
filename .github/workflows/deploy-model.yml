@@ -101,11 +101,11 @@ jobs:
           NAMESPACE="${{ steps.determine_env.outputs.namespace }}"
           PREFIX="${{ steps.determine_env.outputs.prefix }}"
           
-          echo "Waiting for InferenceService ${PREFIX}qwen2.5-0.5b-instruct to be ready in $NAMESPACE..."
-          oc wait --for=condition=Ready inferenceservice/${PREFIX}qwen2.5-0.5b-instruct -n $NAMESPACE --timeout=600s || true
+          echo "Waiting for InferenceService ${PREFIX}qwen25-05b-instruct to be ready in $NAMESPACE..."
+          oc wait --for=condition=Ready inferenceservice/${PREFIX}qwen25-05b-instruct -n $NAMESPACE --timeout=600s || true
           oc get inferenceservice -n $NAMESPACE
           echo "Current deployment status for $ENV environment:"
-          oc describe inferenceservice ${PREFIX}qwen2.5-0.5b-instruct -n $NAMESPACE | tail -20
+          oc describe inferenceservice ${PREFIX}qwen25-05b-instruct -n $NAMESPACE | tail -20
       
       - name: Show deployment info
         if: always()

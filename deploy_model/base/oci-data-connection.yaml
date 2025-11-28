@@ -1,7 +1,7 @@
 kind: Secret
 apiVersion: v1
 metadata:
-  name: qwen2.5-0.5b-instruct
+  name: qwen25-05b-instruct
   labels:
     opendatahub.io/dashboard: 'true'
   annotations:

@@ -1,25 +1,77 @@
 # LLMOps Demo - Automated Model Deployment to OpenShift
 
-This repository demonstrates a simple LLMOps workflow using GitHub Actions to automatically deploy AI models to an OpenShift cluster running Red Hat OpenShift AI.
+This repository demonstrates a production-ready LLMOps workflow using **Kustomize overlays** and **GitHub Actions** to automatically deploy AI models to OpenShift with environment-specific configurations.
 
 ## Overview
 
-When you push changes to model deployment files in this repository, GitHub Actions automatically:
-1. Connects to your OpenShift cluster
-2. Applies the updated model configuration
-3. Waits for the model to be ready
-4. Reports deployment status
+This demo showcases:
+- **Environment-based deployments** using Kustomize overlays (dev, staging, production)
+- **Automated CI/CD** for model deployments via GitHub Actions
+- **GitOps best practices** for managing model lifecycle
+- **Progressive rollout strategy** from dev → staging → production
+
+When you push changes to model deployment files, GitHub Actions automatically:
+1. Detects which environment changed
+2. Connects to your OpenShift cluster
+3. Applies the environment-specific configuration
+4. Waits for the model to be ready
+5. Reports deployment status
 
 ## Architecture
 
 ```
-Developer Push → GitHub → GitHub Actions → OpenShift Cluster → Model Deployed
+Developer → Git Push → GitHub Actions → OpenShift (Dev/Staging/Prod) → Model Deployed
 ```
 
+**Technology Stack:**
 - **Model**: Qwen 2.5 0.5B Instruct (vLLM inference)
 - **Platform**: Red Hat OpenShift AI with KServe
 - **Automation**: GitHub Actions
-- **Deployment**: Kustomize
+- **Configuration Management**: Kustomize with overlays
+- **GitOps**: Infrastructure and models as code
+
+---
+
+## Repository Structure
+
+```
+.
+├── .github/
+│   └── workflows/
+│       └── deploy-model.yml          # GitHub Actions workflow
+├── deploy_model/
+│   ├── base/                         # Base configuration (shared)
+│   │   ├── inferenceservice.yaml     # Model definition
+│   │   ├── servingruntime.yaml       # vLLM runtime config
+│   │   ├── oci-data-connection.yaml  # Model source
+│   │   └── kustomization.yaml
+│   ├── overlays/                     # Environment-specific configs
+│   │   ├── dev/                      # Development environment
+│   │   │   └── kustomization.yaml
+│   │   ├── staging/                  # Staging environment
+│   │   │   └── kustomization.yaml
+│   │   └── production/               # Production environment
+│   │       └── kustomization.yaml
+│   └── README.md                     # Overlay documentation
+└── README.md                         # This file
+```
+
+---
+
+## Environment Configurations
+
+This demo uses **Kustomize overlays** to manage three environments with different resource allocations:
+
+| Environment | CPU Limit | Memory Limit | Replicas | Purpose |
+|-------------|-----------|--------------|----------|---------|
+| **Dev** | 1 core | 6Gi | 1 (fixed) | Development & testing |
+| **Staging** | 2 cores | 8Gi | 1-2 (autoscaling) | Pre-production validation |
+| **Production** | 4 cores | 12Gi | 2-3 (autoscaling + HA) | Production workloads |
+
+**Name Prefixes:**
+- Dev: `dev-qwen2dot5-0dot5b-instruct`
+- Staging: `staging-qwen2dot5-0dot5b-instruct`
+- Production: `prod-qwen2dot5-0dot5b-instruct`
 
 ---
 
@@ -28,8 +80,9 @@ Developer Push → GitHub → GitHub Actions → OpenShift Cluster → Model Dep
 - OpenShift cluster with Red Hat OpenShift AI installed
 - KServe enabled on the cluster
 - GPU nodes available (with NVIDIA GPU operator)
-- GitHub account
+- GitHub account with Personal Access Token (with `workflow` scope)
 - `oc` CLI installed locally
+- `kustomize` installed (optional, for local testing)
 
 ---
 
@@ -91,22 +144,28 @@ Example output: `https://api.cluster-xxxxx.opentlc.com:6443`
 2. Create a new repository (public or private)
 3. Do not initialize with README, .gitignore, or license
 
-#### Clone and Push This Code
+#### Create Personal Access Token with Workflow Scope
+1. Go to https://github.com/settings/tokens
+2. Click **"Generate new token (classic)"**
+3. Select scopes:
+   - ✅ `repo` (all)
+   - ✅ `workflow`
+4. Generate and copy the token
+
+#### Push Code to GitHub
 ```bash
 # Initialize git (if not already done)
 git init
 git add .
-git commit -m "Initial commit: LLMOps demo setup"
+git commit -m "Initial commit: LLMOps demo with Kustomize overlays"
 
 # Add GitHub remote
-git remote add origin https://github.com/YOUR_USERNAME/llmops-demo.git
+git remote add origin https://YOUR_TOKEN@github.com/YOUR_USERNAME/llmops-demo.git
 
 # Push to GitHub
 git branch -M main
 git push -u origin main
 ```
-
-**Note**: Your Personal Access Token must have `workflow` scope to push workflow files.
 
 ---
 
@@ -129,16 +188,16 @@ git push -u origin main
 
 ## Usage
 
-### Manual Initial Deployment
+### Initial Manual Deployment
 
-Deploy the model manually the first time:
+Deploy to dev environment first to test:
 
 ```bash
 # Login to OpenShift
 oc login --server=YOUR_SERVER_URL --token=YOUR_TOKEN
 
-# Deploy the model
-oc apply -k deploy_model/
+# Deploy dev environment
+oc apply -k deploy_model/overlays/dev/
 
 # Check deployment status
 oc get inferenceservice -n llmops-demo
@@ -147,81 +206,144 @@ oc get inferenceservice -n llmops-demo
 oc get route -n llmops-demo
 ```
 
-### Making Changes via LLMOps Workflow
+### Automated Deployments via GitHub Actions
 
-After the initial deployment, any changes to model configuration will be automatically deployed:
+The workflow automatically deploys based on which files are changed:
 
-1. **Edit model files** in `deploy_model/` directory:
-   - `inferenceservice.yaml` - Model configuration, resources, scaling
-   - `servingruntime.yaml` - Runtime settings (vLLM parameters)
-   - `oci-data-connection.yaml` - Model source location
+#### Deploy to Dev
+```bash
+# Edit dev overlay
+vim deploy_model/overlays/dev/kustomization.yaml
 
-2. **Commit and push changes**:
-   ```bash
-   git add deploy_model/
-   git commit -m "Update model configuration"
-   git push
-   ```
-
-3. **Watch automation**:
-   - Go to `https://github.com/YOUR_USERNAME/llmops-demo/actions`
-   - View the workflow run in real-time
-   - Check OpenShift console for updated deployment
-
-### Example Changes
-
-**Update CPU resources:**
-```yaml
-resources:
-  limits:
-    cpu: '4'  # Changed from 2
+# Commit and push
+git add deploy_model/overlays/dev/
+git commit -m "Update dev environment configuration"
+git push
 ```
 
-**Change model version:**
-```yaml
-storageUri: 'oci://quay.io/redhat-ai-services/modelcar-catalog:granite-3.0-2b-instruct'
+GitHub Actions will automatically deploy to the **dev** environment.
+
+#### Deploy to Staging
+```bash
+# Edit staging overlay
+vim deploy_model/overlays/staging/kustomization.yaml
+
+# Commit and push
+git add deploy_model/overlays/staging/
+git commit -m "Promote changes to staging"
+git push
 ```
 
-**Scale replicas:**
-```yaml
-maxReplicas: 3
-minReplicas: 2
+GitHub Actions will automatically deploy to the **staging** environment.
+
+#### Deploy to Production
+```bash
+# Edit production overlay
+vim deploy_model/overlays/production/kustomization.yaml
+
+# Commit and push
+git add deploy_model/overlays/production/
+git commit -m "Deploy to production"
+git push
 ```
+
+GitHub Actions will automatically deploy to the **production** environment.
+
+### Manual Workflow Dispatch
+
+You can also manually trigger deployments from GitHub UI:
+
+1. Go to **Actions** tab in your repository
+2. Select **"Deploy Model to OpenShift"** workflow
+3. Click **"Run workflow"**
+4. Choose environment: dev, staging, or production
+5. Click **"Run workflow"**
 
 ---
 
-## Repository Structure
+## LLMOps Workflows
+
+### Progressive Rollout Pattern
 
 ```
-.
-├── .github/
-│   └── workflows/
-│       └── deploy-model.yml    # GitHub Actions workflow
-├── deploy_model/               # Model deployment manifests
-│   ├── inferenceservice.yaml   # Model definition
-│   ├── kustomization.yaml      # Kustomize configuration
-│   ├── oci-data-connection.yaml # Model source credentials
-│   └── servingruntime.yaml     # vLLM runtime configuration
-└── README.md                   # This file
+1. Develop & Test (Dev)
+   ├─ Make changes to base/ or dev overlay
+   ├─ Push changes
+   └─ Auto-deploy to dev environment
+
+2. Validate (Staging)
+   ├─ Test passes in dev
+   ├─ Update staging overlay
+   └─ Auto-deploy to staging environment
+
+3. Production Release
+   ├─ Validate in staging
+   ├─ Update production overlay
+   └─ Auto-deploy to production environment
+```
+
+### Common LLMOps Scenarios
+
+#### Scenario 1: Update All Environments (Model Version Change)
+```bash
+# Edit base configuration (applies to all environments)
+vim deploy_model/base/inferenceservice.yaml
+
+# Change storageUri to new model version
+# Commit and push
+
+git add deploy_model/base/
+git commit -m "Upgrade model from 0.5B to 3B"
+git push
+
+# Then progressively update each environment's overlay
+```
+
+#### Scenario 2: Scale Production Only
+```bash
+# Edit production overlay
+vim deploy_model/overlays/production/kustomization.yaml
+
+# Increase replicas in the patches section
+git add deploy_model/overlays/production/
+git commit -m "Scale production to 5 replicas for Black Friday"
+git push
+```
+
+#### Scenario 3: Test New Inference Settings in Dev
+```bash
+# Edit base servingruntime
+vim deploy_model/base/servingruntime.yaml
+
+# Add new vLLM arguments
+# Test in dev first, then promote to staging/prod
 ```
 
 ---
 
 ## Workflow Details
 
-The GitHub Action workflow (`.github/workflows/deploy-model.yml`) triggers on:
-- Push to `main` branch
-- Changes to files in `deploy_model/` directory
-- Manual workflow dispatch
+The GitHub Action workflow (`.github/workflows/deploy-model.yml`) features:
+
+**Triggers:**
+- Push to `main` branch (changes in `deploy_model/` directory)
+- Manual workflow dispatch with environment selection
+
+**Smart Environment Detection:**
+- Automatically detects which overlay was modified
+- Routes deployment to the appropriate environment
+- Waits for InferenceService to be ready
+- Reports deployment status
 
 **Workflow Steps:**
 1. Checkout code
 2. Install OpenShift CLI
 3. Login to OpenShift cluster
-4. Show what changed
-5. Apply model configuration: `oc apply -k deploy_model/`
-6. Wait for InferenceService to be ready
-7. Display deployment status
+4. Determine target environment (auto or manual)
+5. Show what changed
+6. Apply environment-specific configuration: `oc apply -k deploy_model/overlays/$ENV/`
+7. Wait for InferenceService to be ready (with proper naming)
+8. Display deployment status and events
 
 ---
 
@@ -234,40 +356,130 @@ The GitHub Action workflow (`.github/workflows/deploy-model.yml`) triggers on:
 - **API**: OpenAI-compatible endpoints
 - **GPU Required**: 1x NVIDIA GPU
 
-**Resources:**
+**Base Resources** (overridden by overlays):
 - CPU: 1-2 cores
 - Memory: 4-8 GiB
 - GPU: 1
 
 ---
 
-## Accessing the Deployed Model
+## Testing Locally
 
-After deployment, the model is accessible via an external route with OAuth authentication:
+Preview what Kustomize will generate for each environment:
 
 ```bash
-# Get the route URL
-oc get route -n llmops-demo
+# Preview dev configuration
+kustomize build deploy_model/overlays/dev/
 
-# Test the model (requires authentication)
-curl https://YOUR_ROUTE_URL/v1/models
+# Preview staging configuration
+kustomize build deploy_model/overlays/staging/
+
+# Preview production configuration
+kustomize build deploy_model/overlays/production/
+
+# Compare dev vs production
+diff <(kustomize build deploy_model/overlays/dev/) \
+     <(kustomize build deploy_model/overlays/production/)
 ```
 
 ---
 
-## What This Demonstrates
+## Accessing the Deployed Model
 
-This LLMOps demo showcases:
-- ✅ **GitOps for AI/ML** - Infrastructure and models as code
-- ✅ **Automated Deployment** - Push code, get deployed model
-- ✅ **Version Control** - Track all model configuration changes
-- ✅ **CI/CD for Models** - Continuous deployment pipeline
-- ✅ **Change Management** - Review and approve model changes via Git
-- ✅ **Reproducibility** - All configurations in version control
+After deployment, models are accessible via external routes with OAuth authentication:
+
+```bash
+# List all routes
+oc get route -n llmops-demo
+
+# Example routes:
+# - dev-qwen2dot5-0dot5b-instruct-llmops-demo.apps.cluster...
+# - staging-qwen2dot5-0dot5b-instruct-llmops-demo.apps.cluster...
+# - prod-qwen2dot5-0dot5b-instruct-llmops-demo.apps.cluster...
+
+# Test the model endpoint
+ROUTE_URL=$(oc get route dev-qwen2dot5-0dot5b-instruct -n llmops-demo -o jsonpath='{.spec.host}')
+curl https://$ROUTE_URL/v1/models
+```
+
+---
+
+## What This LLMOps Demo Showcases
+
+✅ **Environment-Based Deployments** - Separate configs for dev/staging/prod using Kustomize overlays
+
+✅ **GitOps for AI/ML** - Infrastructure and models as code with version control
+
+✅ **Automated CI/CD** - Push code, trigger automatic deployment to correct environment
+
+✅ **Progressive Delivery** - Safe rollout pattern from dev → staging → production
+
+✅ **Configuration Management** - DRY principle with base + overlays (no duplication)
+
+✅ **Reproducibility** - All configurations tracked in Git, auditable and repeatable
+
+✅ **Resource Optimization** - Right-sized resources per environment (cost-effective)
+
+✅ **Change Management** - Review and approve model changes via Pull Requests
+
+✅ **Multi-Environment Management** - Manage multiple model instances with single codebase
+
+---
+
+## Advanced Topics
+
+### Adding a New Environment
+
+1. Create new overlay directory:
+   ```bash
+   mkdir -p deploy_model/overlays/qa
+   ```
+
+2. Create kustomization.yaml with environment-specific patches
+
+3. Update GitHub Actions workflow to recognize the new environment
+
+### Changing the Model
+
+To deploy a completely different model:
+
+1. Update `deploy_model/base/inferenceservice.yaml`:
+   - Change `storageUri` to new model location
+   - Update resource requirements
+   - Modify display names
+
+2. Update `deploy_model/base/servingruntime.yaml`:
+   - Adjust vLLM arguments for the new model
+
+3. Test in dev, validate in staging, deploy to production
+
+---
+
+## Troubleshooting
+
+### Check Deployment Status
+```bash
+# View all inference services
+oc get inferenceservice -n llmops-demo
+
+# Describe specific service
+oc describe inferenceservice dev-qwen2dot5-0dot5b-instruct -n llmops-demo
+
+# Check pods
+oc get pods -n llmops-demo
+
+# View logs
+oc logs <pod-name> -n llmops-demo
+```
+
+### GitHub Actions Failing
+1. Check GitHub Secrets are set correctly
+2. Verify service account has proper permissions
+3. Check OpenShift token hasn't expired
+4. Review workflow logs in Actions tab
 
 ---
 
 ## License
 
 This is a demonstration project for educational purposes.
-
