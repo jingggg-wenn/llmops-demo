@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for accurate diff detection
       
       - name: Install OpenShift CLI
         run: |
@@ -50,28 +52,38 @@ jobs:
           else
             # Auto-detect based on changed files
             echo "Detecting environment from changed files..."
+            echo "Push event from: ${{ github.event.before }} to ${{ github.event.after }}"
             
-            # Get changed files
-            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD 2>/dev/null || git diff --name-only HEAD 2>/dev/null || echo "")
+            # Use GitHub's event data for merge-friendly detection
+            if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+              # Use the before/after SHAs from GitHub event
+              CHANGED_FILES=$(git diff --name-only ${{ github.event.before }}..${{ github.event.after }})
+            else
+              # Fallback for first commit or when event data unavailable
+              CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git show --name-only --pretty=format: HEAD)
+            fi
+            
+            echo ""
             echo "Changed files:"
             echo "$CHANGED_FILES"
+            echo ""
             
-            # Check which overlay was changed
+            # Check which overlay was changed (priority: prod > staging > dev)
             if echo "$CHANGED_FILES" | grep -q 'deploy_model/overlays/production/'; then
               ENV="production"
-              echo "Detected production overlay changes"
+              echo "✓ Detected PRODUCTION overlay changes"
             elif echo "$CHANGED_FILES" | grep -q 'deploy_model/overlays/staging/'; then
               ENV="staging"
-              echo "Detected staging overlay changes"
+              echo "✓ Detected STAGING overlay changes"
             elif echo "$CHANGED_FILES" | grep -q 'deploy_model/overlays/dev/'; then
               ENV="dev"
-              echo "Detected dev overlay changes"
+              echo "✓ Detected DEV overlay changes"
             elif echo "$CHANGED_FILES" | grep -q 'deploy_model/base/'; then
               ENV="dev"
-              echo "Detected base changes, defaulting to dev for testing"
+              echo "✓ Detected base/ changes, defaulting to DEV for testing"
             else
               ENV="dev"
-              echo "No specific overlay detected, defaulting to dev"
+              echo "⚠ No overlay detected in changes, defaulting to DEV"
             fi
           fi
           
