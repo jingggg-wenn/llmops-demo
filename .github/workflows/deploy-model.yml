@@ -50,40 +50,28 @@ jobs:
           else
             # Auto-detect based on changed files
             echo "Detecting environment from changed files..."
-            echo "Event: ${{ github.event_name }}"
-            echo "Before SHA: ${{ github.event.before }}"
-            echo "After SHA: ${{ github.event.after }}"
             
-            # Use GitHub event data for accurate file comparison
-            if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-              # Normal push or PR merge
-              CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }})
-            else
-              # First commit in repo
-              CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
-            fi
-            
-            echo ""
+            # Get changed files
+            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD 2>/dev/null || git diff --name-only HEAD 2>/dev/null || echo "")
             echo "Changed files:"
             echo "$CHANGED_FILES"
-            echo ""
             
-            # Check which overlay was changed (priority order: prod > staging > dev)
+            # Check which overlay was changed
             if echo "$CHANGED_FILES" | grep -q 'deploy_model/overlays/production/'; then
               ENV="production"
-              echo "✓ Detected production overlay changes"
+              echo "Detected production overlay changes"
             elif echo "$CHANGED_FILES" | grep -q 'deploy_model/overlays/staging/'; then
               ENV="staging"
-              echo "✓ Detected staging overlay changes"
+              echo "Detected staging overlay changes"
             elif echo "$CHANGED_FILES" | grep -q 'deploy_model/overlays/dev/'; then
               ENV="dev"
-              echo "✓ Detected dev overlay changes"
+              echo "Detected dev overlay changes"
             elif echo "$CHANGED_FILES" | grep -q 'deploy_model/base/'; then
               ENV="dev"
-              echo "✓ Detected base changes, defaulting to dev for testing"
+              echo "Detected base changes, defaulting to dev for testing"
             else
               ENV="dev"
-              echo "⚠ No overlay detected, defaulting to dev"
+              echo "No specific overlay detected, defaulting to dev"
             fi
           fi
           
@@ -106,8 +94,7 @@ jobs:
           echo "environment=$ENV" >> $GITHUB_OUTPUT
           echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
           echo "prefix=$PREFIX" >> $GITHUB_OUTPUT
-          echo ""
-          echo "==> Final Decision: Deploying to $ENV (namespace: $NAMESPACE)"
+          echo "==> Deploying to: $ENV (namespace: $NAMESPACE)"
       
       - name: Show what changed
         run: |
