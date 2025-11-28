@@ -53,6 +53,10 @@ Developer → Git Push → GitHub Actions → OpenShift (Dev/Staging/Prod) → M
 │   │   └── production/               # Production environment
 │   │       └── kustomization.yaml
 │   └── README.md                     # Overlay documentation
+├── setup_scripts/                    # Setup automation
+│   ├── setup-namespaces.sh           # Automated namespace setup
+│   ├── SETUP-MULTI-NAMESPACE.md      # Detailed setup guide
+│   └── README.md                     # Setup scripts documentation
 └── README.md                         # This file
 ```
 
@@ -69,9 +73,9 @@ This demo uses **Kustomize overlays** to manage three environments with differen
 | **Production** | 4 cores | 12Gi | 2-3 (autoscaling + HA) | Production workloads |
 
 **Name Prefixes:**
-- Dev: `dev-qwen2dot5-0dot5b-instruct`
-- Staging: `staging-qwen2dot5-0dot5b-instruct`
-- Production: `prod-qwen2dot5-0dot5b-instruct`
+- Dev: `dev-qwen25-05b-instruct`
+- Staging: `staging-qwen25-05b-instruct`
+- Production: `prod-qwen25-05b-instruct`
 
 ---
 
@@ -88,42 +92,75 @@ This demo uses **Kustomize overlays** to manage three environments with differen
 
 ## Setup Instructions
 
-### 1. OpenShift Cluster Setup
+### Quick Setup (Recommended)
 
-#### Create Namespace
+**Use the automated setup script:**
+
 ```bash
-oc create namespace llmops-demo
+# Login to OpenShift
+oc login https://YOUR_CLUSTER_URL
+
+# Run the automated setup
+./setup_scripts/setup-namespaces.sh
 ```
 
-#### Create Service Account for GitHub Actions
+This script automatically creates all three namespaces (dev, staging, production) with proper permissions and generates credentials for GitHub Actions.
+
+**For detailed setup instructions**, see [setup_scripts/SETUP-MULTI-NAMESPACE.md](setup_scripts/SETUP-MULTI-NAMESPACE.md)
+
+---
+
+### Manual Setup (Alternative)
+
+If you prefer manual setup:
+
+#### Create Namespaces
 ```bash
-# Create service account
-oc create serviceaccount github-deployer -n llmops-demo
+# Create three namespaces
+oc create namespace llmops-dev
+oc create namespace llmops-staging
+oc create namespace llmops-prod
 
-# Create role with deployment permissions
-oc create role model-deployer -n llmops-demo \
+# Create service accounts and permissions
+# (Run for each namespace: llmops-dev, llmops-staging, llmops-prod)
+for NS in llmops-dev llmops-staging llmops-prod; do
+  oc create serviceaccount github-deployer -n $NS
+  
+  oc create role model-deployer -n $NS \
+    --verb=get,list,watch,create,update,patch,delete \
+    --resource=inferenceservices,servingruntimes,secrets,services,routes
+  
+  oc create role model-deployer-core -n $NS \
+    --verb=get,list,watch \
+    --resource=pods,deployments,events
+  
+  oc create rolebinding model-deployer-binding -n $NS \
+    --role=model-deployer \
+    --serviceaccount=$NS:github-deployer
+  
+  oc create rolebinding model-deployer-core-binding -n $NS \
+    --role=model-deployer-core \
+    --serviceaccount=$NS:github-deployer
+done
+
+# Create ClusterRole for cross-namespace access
+oc create clusterrole llmops-model-deployer \
   --verb=get,list,watch,create,update,patch,delete \
-  --resource=inferenceservices,servingruntimes,secrets,services,routes
+  --resource=inferenceservices,servingruntimes,secrets,services,routes,pods,deployments,events
 
-# Create role for monitoring resources
-oc create role model-deployer-core -n llmops-demo \
-  --verb=get,list,watch \
-  --resource=pods,deployments,events
-
-# Bind roles to service account
-oc create rolebinding model-deployer-binding -n llmops-demo \
-  --role=model-deployer \
-  --serviceaccount=llmops-demo:github-deployer
-
-oc create rolebinding model-deployer-core-binding -n llmops-demo \
-  --role=model-deployer-core \
-  --serviceaccount=llmops-demo:github-deployer
+# Grant cross-namespace permissions to dev service account
+for NS in llmops-dev llmops-staging llmops-prod; do
+  oc create rolebinding llmops-cross-namespace -n $NS \
+    --clusterrole=llmops-model-deployer \
+    --serviceaccount=llmops-dev:github-deployer
+done
 ```
 
 #### Generate Service Account Token
 ```bash
-# Generate long-lived token (1 year)
-oc create token github-deployer -n llmops-demo --duration=8760h
+# Generate long-lived token (1 year) from dev namespace
+# This token has access to all three namespaces via cross-namespace permissions
+oc create token github-deployer -n llmops-dev --duration=8760h
 ```
 
 Save this token - you'll need it for GitHub Secrets.
@@ -134,6 +171,8 @@ oc whoami --show-server
 ```
 
 Example output: `https://api.cluster-xxxxx.opentlc.com:6443`
+
+**Note:** The automated script ([setup_scripts/setup-namespaces.sh](setup_scripts/setup-namespaces.sh)) handles all of the above automatically.
 
 ---
 
@@ -200,10 +239,10 @@ oc login --server=YOUR_SERVER_URL --token=YOUR_TOKEN
 oc apply -k deploy_model/overlays/dev/
 
 # Check deployment status
-oc get inferenceservice -n llmops-demo
+oc get inferenceservice -n llmops-dev
 
 # Get the external route
-oc get route -n llmops-demo
+oc get route -n llmops-dev
 ```
 
 ### Automated Deployments via GitHub Actions
@@ -389,16 +428,21 @@ diff <(kustomize build deploy_model/overlays/dev/) \
 After deployment, models are accessible via external routes with OAuth authentication:
 
 ```bash
-# List all routes
-oc get route -n llmops-demo
+# List all routes across environments
+oc get route --all-namespaces | grep llmops
+
+# Or list routes per environment
+oc get route -n llmops-dev
+oc get route -n llmops-staging
+oc get route -n llmops-prod
 
 # Example routes:
-# - dev-qwen2dot5-0dot5b-instruct-llmops-demo.apps.cluster...
-# - staging-qwen2dot5-0dot5b-instruct-llmops-demo.apps.cluster...
-# - prod-qwen2dot5-0dot5b-instruct-llmops-demo.apps.cluster...
+# - dev-qwen25-05b-instruct-llmops-dev.apps.cluster...
+# - staging-qwen25-05b-instruct-llmops-staging.apps.cluster...
+# - prod-qwen25-05b-instruct-llmops-prod.apps.cluster...
 
 # Test the model endpoint
-ROUTE_URL=$(oc get route dev-qwen2dot5-0dot5b-instruct -n llmops-demo -o jsonpath='{.spec.host}')
+ROUTE_URL=$(oc get route dev-qwen25-05b-instruct -n llmops-dev -o jsonpath='{.spec.host}')
 curl https://$ROUTE_URL/v1/models
 ```
 
@@ -459,17 +503,22 @@ To deploy a completely different model:
 
 ### Check Deployment Status
 ```bash
-# View all inference services
-oc get inferenceservice -n llmops-demo
+# View all inference services across environments
+oc get inferenceservice --all-namespaces | grep llmops
+
+# View specific environment
+oc get inferenceservice -n llmops-dev
+oc get inferenceservice -n llmops-staging
+oc get inferenceservice -n llmops-prod
 
 # Describe specific service
-oc describe inferenceservice dev-qwen2dot5-0dot5b-instruct -n llmops-demo
+oc describe inferenceservice dev-qwen25-05b-instruct -n llmops-dev
 
-# Check pods
-oc get pods -n llmops-demo
+# Check pods in specific environment
+oc get pods -n llmops-dev
 
 # View logs
-oc logs <pod-name> -n llmops-demo
+oc logs <pod-name> -n llmops-dev
 ```
 
 ### GitHub Actions Failing

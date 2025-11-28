@@ -142,8 +142,9 @@ oc apply -k overlays/dev/ --dry-run=client
 
 ## More Information
 
-See the main [README.md](../README.md) for:
-- Complete setup instructions
-- GitHub Actions integration
-- Troubleshooting guide
-- Architecture overview
+See additional documentation:
+- [Main README](../README.md) - Complete project overview and setup
+- [Setup Scripts](../setup_scripts/README.md) - Automated namespace setup
+- [Multi-Namespace Guide](../setup_scripts/SETUP-MULTI-NAMESPACE.md) - Detailed multi-namespace setup
+- GitHub Actions integration details in main README
+- Troubleshooting guide in setup documentation
