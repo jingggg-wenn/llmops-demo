@@ -1,0 +1,66 @@
+name: Deploy Model to OpenShift
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'deploy_model/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to OpenShift
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install OpenShift CLI
+        run: |
+          curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz
+          tar -xzf openshift-client-linux.tar.gz
+          sudo mv oc /usr/local/bin/
+          sudo chmod +x /usr/local/bin/oc
+          oc version --client
+      
+      - name: Login to OpenShift
+        run: |
+          oc login --token=${{ secrets.OPENSHIFT_TOKEN }} --server=${{ secrets.OPENSHIFT_SERVER }} --insecure-skip-tls-verify=true
+          oc whoami
+          echo "Logged in to OpenShift successfully"
+      
+      - name: Show what changed
+        run: |
+          echo "Deployment triggered by: ${{ github.actor }}"
+          echo "Commit message: ${{ github.event.head_commit.message }}"
+          echo "Files changed:"
+          git diff --name-only HEAD^ HEAD | grep 'deploy_model/' || echo "No deploy_model files changed"
+      
+      - name: Deploy model to OpenShift
+        run: |
+          echo "Deploying to namespace: llmops-demo"
+          oc apply -k deploy_model/
+          echo "Deployment applied successfully"
+      
+      - name: Wait for InferenceService to be ready
+        run: |
+          echo "Waiting for InferenceService to be ready..."
+          oc wait --for=condition=Ready inferenceservice/qwen2dot5-0dot5b-instruct -n llmops-demo --timeout=600s || true
+          oc get inferenceservice -n llmops-demo
+          echo "Current deployment status:"
+          oc describe inferenceservice qwen2dot5-0dot5b-instruct -n llmops-demo | tail -20
+      
+      - name: Show deployment info
+        if: always()
+        run: |
+          echo "=== InferenceService Status ==="
+          oc get inferenceservice -n llmops-demo -o wide
+          echo ""
+          echo "=== Pods ==="
+          oc get pods -n llmops-demo
+          echo ""
+          echo "=== Recent Events ==="
+          oc get events -n llmops-demo --sort-by='.lastTimestamp' | tail -10
+
