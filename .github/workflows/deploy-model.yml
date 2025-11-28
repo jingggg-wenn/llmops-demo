@@ -7,6 +7,16 @@ on:
     paths:
       - 'deploy_model/**'
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
 
 jobs:
   deploy:
@@ -31,36 +41,82 @@ jobs:
           oc whoami
           echo "Logged in to OpenShift successfully"
       
+      - name: Determine environment
+        id: determine_env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          else
+            # Auto-detect based on changed files
+            if git diff --name-only HEAD^ HEAD | grep -q 'deploy_model/overlays/production/'; then
+              ENV="production"
+            elif git diff --name-only HEAD^ HEAD | grep -q 'deploy_model/overlays/staging/'; then
+              ENV="staging"
+            else
+              ENV="dev"
+            fi
+          fi
+          
+          # Set namespace based on environment
+          case $ENV in
+            production)
+              NAMESPACE="llmops-prod"
+              PREFIX="prod-"
+              ;;
+            staging)
+              NAMESPACE="llmops-staging"
+              PREFIX="staging-"
+              ;;
+            dev)
+              NAMESPACE="llmops-dev"
+              PREFIX="dev-"
+              ;;
+          esac
+          
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
+          echo "prefix=$PREFIX" >> $GITHUB_OUTPUT
+          echo "Deploying to: $ENV (namespace: $NAMESPACE)"
+      
       - name: Show what changed
         run: |
           echo "Deployment triggered by: ${{ github.actor }}"
+          echo "Target environment: ${{ steps.determine_env.outputs.environment }}"
+          echo "Target namespace: ${{ steps.determine_env.outputs.namespace }}"
           echo "Commit message: ${{ github.event.head_commit.message }}"
           echo "Files changed:"
           git diff --name-only HEAD^ HEAD | grep 'deploy_model/' || echo "No deploy_model files changed"
       
       - name: Deploy model to OpenShift
         run: |
-          echo "Deploying to namespace: llmops-demo"
-          oc apply -k deploy_model/
-          echo "Deployment applied successfully"
+          ENV="${{ steps.determine_env.outputs.environment }}"
+          NAMESPACE="${{ steps.determine_env.outputs.namespace }}"
+          echo "Deploying $ENV environment to namespace: $NAMESPACE"
+          oc apply -k deploy_model/overlays/$ENV/
+          echo "Deployment applied successfully for $ENV environment in $NAMESPACE namespace"
       
       - name: Wait for InferenceService to be ready
         run: |
-          echo "Waiting for InferenceService to be ready..."
-          oc wait --for=condition=Ready inferenceservice/qwen2dot5-0dot5b-instruct -n llmops-demo --timeout=600s || true
-          oc get inferenceservice -n llmops-demo
-          echo "Current deployment status:"
-          oc describe inferenceservice qwen2dot5-0dot5b-instruct -n llmops-demo | tail -20
+          ENV="${{ steps.determine_env.outputs.environment }}"
+          NAMESPACE="${{ steps.determine_env.outputs.namespace }}"
+          PREFIX="${{ steps.determine_env.outputs.prefix }}"
+          
+          echo "Waiting for InferenceService ${PREFIX}qwen2.5-0.5b-instruct to be ready in $NAMESPACE..."
+          oc wait --for=condition=Ready inferenceservice/${PREFIX}qwen2.5-0.5b-instruct -n $NAMESPACE --timeout=600s || true
+          oc get inferenceservice -n $NAMESPACE
+          echo "Current deployment status for $ENV environment:"
+          oc describe inferenceservice ${PREFIX}qwen2.5-0.5b-instruct -n $NAMESPACE | tail -20
       
       - name: Show deployment info
         if: always()
         run: |
-          echo "=== InferenceService Status ==="
-          oc get inferenceservice -n llmops-demo -o wide
+          NAMESPACE="${{ steps.determine_env.outputs.namespace }}"
+          echo "=== InferenceService Status in $NAMESPACE ==="
+          oc get inferenceservice -n $NAMESPACE -o wide
           echo ""
           echo "=== Pods ==="
-          oc get pods -n llmops-demo
+          oc get pods -n $NAMESPACE
           echo ""
           echo "=== Recent Events ==="
-          oc get events -n llmops-demo --sort-by='.lastTimestamp' | tail -10
+          oc get events -n $NAMESPACE --sort-by='.lastTimestamp' | tail -10
 
