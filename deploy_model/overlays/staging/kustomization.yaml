@@ -16,7 +16,7 @@ patches:
     patch: |-
       - op: replace
         path: /metadata/annotations/openshift.io~1display-name
-        value: "qwen2.5-0.5b-staging-v2"
+        value: "qwen2.5-0.5b-staging"
       - op: replace
         path: /spec/predictor/model/runtime
         value: "staging-qwen25-05b-instruct"
@@ -38,13 +38,4 @@ patches:
       - op: replace
         path: /spec/predictor/model/resources/requests/memory
         value: "4Gi"
-  
-  # Patch ServingRuntime to reduce max-model-len for staging testing
-  - target:
-      kind: ServingRuntime
-      name: qwen25-05b-instruct
-    patch: |-
-      - op: replace
-        path: /spec/containers/0/args/4
-        value: "12000"
 
