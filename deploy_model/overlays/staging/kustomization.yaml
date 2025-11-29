@@ -38,4 +38,13 @@ patches:
       - op: replace
         path: /spec/predictor/model/resources/requests/memory
         value: "4Gi"
+  
+  # Patch ServingRuntime to reduce max-model-len for staging testing
+  - target:
+      kind: ServingRuntime
+      name: qwen25-05b-instruct
+    patch: |-
+      - op: replace
+        path: /spec/containers/0/args/4
+        value: "10000"
 
