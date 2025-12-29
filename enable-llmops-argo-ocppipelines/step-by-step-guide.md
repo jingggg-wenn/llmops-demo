@@ -395,7 +395,14 @@ git commit -m "Initial commit: GitOps LLMOps with ArgoCD and OpenShift Pipelines
 
 ### 5.3 Update ArgoCD Applications with Your Git Repository URL
 
-Before pushing to GitHub, update the ArgoCD Application manifests with your repository URL:
+Before pushing to GitHub, update the ArgoCD Application manifests with your repository URL.
+
+**You need to edit these 3 files:**
+- `argocd-apps/dev-application.yaml`
+- `argocd-apps/staging-application.yaml`
+- `argocd-apps/production-application.yaml`
+
+**Option A: Automated Update (Recommended)**
 
 ```bash
 # Replace YOUR_USERNAME and YOUR_REPO with your actual values
@@ -408,19 +415,56 @@ sed -i.bak "s|https://github.com/YOUR_USERNAME/YOUR_REPO.git|https://github.com/
 # Verify the changes
 grep "repoURL:" argocd-apps/*.yaml
 
+# Expected output:
+# argocd-apps/dev-application.yaml:    repoURL: https://github.com/your-github-username/llmops-gitops-demo.git
+# argocd-apps/production-application.yaml:    repoURL: https://github.com/your-github-username/llmops-gitops-demo.git
+# argocd-apps/staging-application.yaml:    repoURL: https://github.com/your-github-username/llmops-gitops-demo.git
+
 # Commit the changes
 git add argocd-apps/*.yaml
 git commit -m "Update ArgoCD applications with correct Git repository URL"
 ```
 
-**Manual alternative:**
+**Option B: Manual Edit**
 
-Edit each file in `argocd-apps/` and replace:
+Edit each of the three files and find the `repoURL` line (around line 13-14):
+
+**In `argocd-apps/dev-application.yaml`:**
 ```yaml
-repoURL: https://github.com/YOUR_USERNAME/YOUR_REPO.git
+spec:
+  # Source: Git repository with Kustomize overlays
+  source:
+    repoURL: https://github.com/YOUR_USERNAME/YOUR_REPO.git  # ← Change this line
+    targetRevision: main
+    path: enable-llmops-argo-ocppipelines/deploy_model/overlays/dev
 ```
 
-With your actual GitHub repository URL.
+**In `argocd-apps/staging-application.yaml`:**
+```yaml
+spec:
+  # Source: Git repository with Kustomize overlays
+  source:
+    repoURL: https://github.com/YOUR_USERNAME/YOUR_REPO.git  # ← Change this line
+    targetRevision: main
+    path: enable-llmops-argo-ocppipelines/deploy_model/overlays/staging
+```
+
+**In `argocd-apps/production-application.yaml`:**
+```yaml
+spec:
+  # Source: Git repository with Kustomize overlays
+  source:
+    repoURL: https://github.com/YOUR_USERNAME/YOUR_REPO.git  # ← Change this line
+    targetRevision: main
+    path: enable-llmops-argo-ocppipelines/deploy_model/overlays/production
+```
+
+Replace `YOUR_USERNAME` with your GitHub username and `YOUR_REPO` with your repository name.
+
+**Example:**
+```yaml
+repoURL: https://github.com/jsmith/llmops-gitops-demo.git
+```
 
 ### 5.4 Push to GitHub
 
