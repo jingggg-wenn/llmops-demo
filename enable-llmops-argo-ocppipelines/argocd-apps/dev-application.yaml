@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: llmops-dev
+  namespace: openshift-gitops
+  labels:
+    environment: dev
+    app: llmops
+spec:
+  project: default
+  
+  # Source: Git repository with Kustomize overlays
+  source:
+    repoURL: https://github.com/YOUR_USERNAME/YOUR_REPO.git
+    targetRevision: main
+    path: enable-llmops-argo-ocppipelines/deploy_model/overlays/dev
+  
+  # Destination: Target namespace in OpenShift
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: llmops-dev
+  
+  # Sync policy: Auto-sync for dev environment
+  syncPolicy:
+    automated:
+      prune: true      # Remove resources that are no longer in Git
+      selfHeal: true   # Automatically sync when cluster state drifts from Git
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true  # Auto-create namespace if it doesn't exist
+      - PruneLast=true        # Prune resources after new resources are healthy
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  
+  # Ignore differences for certain fields (KServe adds these)
+  ignoreDifferences:
+    - group: serving.kserve.io
+      kind: InferenceService
+      jsonPointers:
+        - /status
+
