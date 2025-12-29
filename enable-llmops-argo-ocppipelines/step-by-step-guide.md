@@ -806,6 +806,81 @@ oc describe inferenceservice dev-qwen25-05b-instruct -n llmops-dev | grep "displ
 
 **Success!** You've just experienced GitOps in action - no manual `oc apply`, no GitHub Actions, just Git as the source of truth.
 
+### 7.5 Adjust ArgoCD Polling Interval (Optional)
+
+By default, ArgoCD polls Git repositories every **3 minutes**. You can change this to sync faster or slower.
+
+**Important:** In OpenShift GitOps, the `argocd-cm` ConfigMap is managed by the operator and will be overwritten if you edit it directly. You must configure settings through the **ArgoCD custom resource** instead.
+
+**Change Global Polling Interval:**
+
+```bash
+# Edit the ArgoCD custom resource (not the ConfigMap)
+oc edit argocd openshift-gitops -n openshift-gitops
+```
+
+Add or modify the `repo` section under `spec`:
+
+```yaml
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+  # ... existing fields ...
+  
+  # Add this section to change polling interval
+  repo:
+    env:
+      - name: ARGOCD_RECONCILIATION_TIMEOUT
+        value: "60s"  # Change from default 180s (3 minutes) to 60s (1 minute)
+```
+
+Save the file. The operator will automatically update the ArgoCD ConfigMap and restart the necessary components.
+
+**Verify the change:**
+
+```bash
+# Check if the setting was applied
+oc get argocd openshift-gitops -n openshift-gitops -o yaml | grep -A 5 "repo:"
+
+# Watch the controller restart (if needed)
+oc get pods -n openshift-gitops -w
+```
+
+**Alternative: Use Webhooks for Instant Sync (Recommended)**
+
+Instead of polling, configure GitHub webhooks for instant notifications:
+
+```bash
+# Get your ArgoCD webhook URL
+ARGOCD_URL=$(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}')
+echo "Webhook URL: https://$ARGOCD_URL/api/webhook"
+```
+
+**Configure in GitHub:**
+1. Go to your repository: `https://github.com/YOUR_USERNAME/YOUR_REPO`
+2. Click **Settings** → **Webhooks** → **Add webhook**
+3. **Payload URL**: `https://<argocd-url>/api/webhook`
+4. **Content type**: `application/json`
+5. **Events**: Select "Just the push event"
+6. Click **Add webhook**
+
+With webhooks, ArgoCD syncs **immediately** when you push to GitHub (no polling delay).
+
+**Force Immediate Sync (Without Waiting):**
+
+If you don't want to wait for the polling interval:
+
+```bash
+# Force ArgoCD to refresh and sync immediately
+oc patch application.argoproj.io llmops-dev -n openshift-gitops --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
+
+# Or use ArgoCD CLI
+argocd app sync llmops-dev
+```
+
 ---
 
 ## Step 8: Test Manual Sync - Staging Environment
