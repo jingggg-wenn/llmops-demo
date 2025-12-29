@@ -1,0 +1,35 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  annotations:
+    openshift.io/display-name: qwen2.5-0.5b-instruct
+    serving.kserve.io/deploymentMode: RawDeployment
+  name: qwen25-05b-instruct
+  labels:
+    opendatahub.io/dashboard: 'true'
+    networking.kserve.io/visibility: exposed
+spec:
+  predictor:
+    maxReplicas: 1
+    minReplicas: 1
+    model:
+      modelFormat:
+        name: vLLM
+      name: ''
+      resources:
+        limits:
+          cpu: '2'
+          memory: 8Gi
+          nvidia.com/gpu: '1'
+        requests:
+          cpu: '1'
+          memory: 4Gi
+          nvidia.com/gpu: '1'
+      runtime: qwen25-05b-instruct
+      storageUri: 'oci://quay.io/redhat-ai-services/modelcar-catalog:qwen2.5-0.5b-instruct'
+    containerConcurrency: 1
+    tolerations:
+    - key: "nvidia.com/gpu"
+      operator: "Exists"
+      effect: "NoSchedule"
+

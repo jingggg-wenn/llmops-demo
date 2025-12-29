@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: llmops-production
+  namespace: openshift-gitops
+  labels:
+    environment: production
+    app: llmops
+spec:
+  project: default
+  
+  # Source: Git repository with Kustomize overlays
+  source:
+    repoURL: https://github.com/YOUR_USERNAME/YOUR_REPO.git
+    targetRevision: main
+    path: enable-llmops-argo-ocppipelines/deploy_model/overlays/production
+  
+  # Destination: Target namespace in OpenShift
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: llmops-prod
+  
+  # Sync policy: Manual sync for production environment
+  syncPolicy:
+    # No automated sync - requires manual approval via ArgoCD UI or CLI
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  
+  # Ignore differences for certain fields (KServe adds these)
+  ignoreDifferences:
+    - group: serving.kserve.io
+      kind: InferenceService
+      jsonPointers:
+        - /status
+
