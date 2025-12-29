@@ -247,14 +247,48 @@ oc get route -n llmops-dev
 
 ### Automated Deployments via GitHub Actions
 
-The workflow automatically deploys based on which files are changed:
+The workflow automatically deploys based on which files are changed. GitHub Actions **only triggers on push to the `main` branch**, so you should:
 
-#### Deploy to Dev
+1. Create a feature branch
+2. Make your changes
+3. Commit and push to the feature branch
+4. Create a Pull Request to merge into `main`
+5. When PR is merged, GitHub Actions automatically deploys
+
+#### Deploy to Dev (via Pull Request)
+
+**Recommended workflow:**
+
 ```bash
+# Create a feature branch for dev changes
+git checkout -b feature/dev-changes
+
 # Edit dev overlay
 vim deploy_model/overlays/dev/kustomization.yaml
 
-# Commit and push
+# Commit changes
+git add deploy_model/overlays/dev/
+git commit -m "Dev: Update CPU limit to 2 cores"
+
+# Push to GitHub
+git push -u origin feature/dev-changes
+
+# On GitHub:
+# 1. Create a Pull Request from feature/dev-changes to main
+# 2. Review the changes
+# 3. Merge the Pull Request
+#
+# GitHub Actions will automatically:
+# - Detect that dev overlay was changed
+# - Deploy to llmops-dev namespace
+```
+
+**Quick workflow (direct push to main):**
+
+```bash
+# Only for simple changes or single-person projects
+git checkout main
+vim deploy_model/overlays/dev/kustomization.yaml
 git add deploy_model/overlays/dev/
 git commit -m "Update dev environment configuration"
 git push
@@ -262,29 +296,53 @@ git push
 
 GitHub Actions will automatically deploy to the **dev** environment.
 
-#### Deploy to Staging
+#### Deploy to Staging (via Pull Request)
+
 ```bash
+# Create a feature branch for staging changes
+git checkout -b feature/staging-changes
+
 # Edit staging overlay
 vim deploy_model/overlays/staging/kustomization.yaml
 
 # Commit and push
 git add deploy_model/overlays/staging/
-git commit -m "Promote changes to staging"
-git push
+git commit -m "Staging: Increase replicas to 2"
+git push -u origin feature/staging-changes
+
+# On GitHub:
+# 1. Create a Pull Request from feature/staging-changes to main
+# 2. Review the changes
+# 3. Merge the Pull Request
+#
+# GitHub Actions will automatically deploy to llmops-staging namespace
 ```
 
 GitHub Actions will automatically deploy to the **staging** environment.
 
-#### Deploy to Production
+#### Deploy to Production (via Pull Request)
+
 ```bash
+# Create a feature branch for production changes
+git checkout -b feature/production-release
+
 # Edit production overlay
 vim deploy_model/overlays/production/kustomization.yaml
 
 # Commit and push
 git add deploy_model/overlays/production/
-git commit -m "Deploy to production"
-git push
+git commit -m "Production: Deploy v2 with increased resources"
+git push -u origin feature/production-release
+
+# On GitHub:
+# 1. Create a Pull Request from feature/production-release to main
+# 2. Request review from team members
+# 3. After approval, merge the Pull Request
+#
+# GitHub Actions will automatically deploy to llmops-prod namespace
 ```
+
+**Note:** For production deployments, always use Pull Requests with team review before merging.
 
 GitHub Actions will automatically deploy to the **production** environment.
 
@@ -297,6 +355,63 @@ You can also manually trigger deployments from GitHub UI:
 3. Click **"Run workflow"**
 4. Choose environment: dev, staging, or production
 5. Click **"Run workflow"**
+
+---
+
+## Pull Request Workflow (Recommended)
+
+This demo follows **GitOps best practices** using Pull Requests for all changes:
+
+### Why Use Pull Requests?
+
+✅ **Code Review** - Team members can review model configuration changes
+✅ **Change Tracking** - Full audit trail of who changed what and when
+✅ **Safe Deployments** - Prevents accidental direct pushes to production
+✅ **CI/CD Automation** - Deployment only happens after PR approval and merge
+
+### Typical PR Workflow
+
+```
+1. Create Feature Branch
+   git checkout -b feature/dev-changes
+   
+2. Make Changes
+   vim deploy_model/overlays/dev/kustomization.yaml
+   
+3. Commit & Push
+   git add deploy_model/overlays/dev/
+   git commit -m "Dev: Update CPU resources"
+   git push -u origin feature/dev-changes
+   
+4. Create Pull Request on GitHub
+   - Navigate to your repository
+   - Click "Compare & pull request"
+   - Add description of changes
+   - Create Pull Request
+   
+5. Review & Merge
+   - Review the changes
+   - Approve the PR
+   - Merge to main
+   
+6. Automatic Deployment
+   - GitHub Actions detects which overlay changed
+   - Deploys to the correct environment automatically
+   - Shows deployment status in Actions tab
+```
+
+### Branch Naming Convention
+
+Use descriptive branch names that indicate:
+- **Environment**: Which overlay you're changing
+- **Purpose**: What the change does
+
+Examples:
+- `feature/dev-changes` - Changes to dev environment
+- `feature/staging-changes` - Changes to staging environment
+- `feature/production-release` - Production deployment
+- `feature/increase-dev-cpu` - Specific change description
+- `feature/update-model-version` - Model version update
 
 ---
 
@@ -369,8 +484,12 @@ The GitHub Action workflow (`.github/workflows/deploy-model.yml`) features:
 - Manual workflow dispatch with environment selection
 
 **Smart Environment Detection:**
-- Automatically detects which overlay was modified
-- Routes deployment to the appropriate environment
+- Automatically detects which overlay was modified in the merged PR
+- Routes deployment to the appropriate environment:
+  - Changes to `deploy_model/overlays/production/` → deploys to **production**
+  - Changes to `deploy_model/overlays/staging/` → deploys to **staging**
+  - Changes to `deploy_model/overlays/dev/` → deploys to **dev**
+  - Changes to `deploy_model/base/` → deploys to **dev** (for testing)
 - Waits for InferenceService to be ready
 - Reports deployment status
 

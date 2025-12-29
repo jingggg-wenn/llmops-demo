@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for accurate diff detection
       
       - name: Install OpenShift CLI
         run: |
@@ -46,14 +48,42 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             ENV="${{ github.event.inputs.environment }}"
+            echo "Manual workflow dispatch, deploying to: $ENV"
           else
             # Auto-detect based on changed files
-            if git diff --name-only HEAD^ HEAD | grep -q 'deploy_model/overlays/production/'; then
+            echo "Detecting environment from changed files..."
+            echo "Push event from: ${{ github.event.before }} to ${{ github.event.after }}"
+            
+            # Use GitHub's event data for merge-friendly detection
+            if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+              # Use the before/after SHAs from GitHub event
+              CHANGED_FILES=$(git diff --name-only ${{ github.event.before }}..${{ github.event.after }})
+            else
+              # Fallback for first commit or when event data unavailable
+              CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git show --name-only --pretty=format: HEAD)
+            fi
+            
+            echo ""
+            echo "Changed files:"
+            echo "$CHANGED_FILES"
+            echo ""
+            
+            # Check which overlay was changed (priority: prod > staging > dev)
+            if echo "$CHANGED_FILES" | grep -q 'deploy_model/overlays/production/'; then
               ENV="production"
-            elif git diff --name-only HEAD^ HEAD | grep -q 'deploy_model/overlays/staging/'; then
+              echo "✓ Detected PRODUCTION overlay changes"
+            elif echo "$CHANGED_FILES" | grep -q 'deploy_model/overlays/staging/'; then
               ENV="staging"
+              echo "✓ Detected STAGING overlay changes"
+            elif echo "$CHANGED_FILES" | grep -q 'deploy_model/overlays/dev/'; then
+              ENV="dev"
+              echo "✓ Detected DEV overlay changes"
+            elif echo "$CHANGED_FILES" | grep -q 'deploy_model/base/'; then
+              ENV="dev"
+              echo "✓ Detected base/ changes, defaulting to DEV for testing"
             else
               ENV="dev"
+              echo "⚠ No overlay detected in changes, defaulting to DEV"
             fi
           fi
           
@@ -76,7 +106,7 @@ jobs:
           echo "environment=$ENV" >> $GITHUB_OUTPUT
           echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
           echo "prefix=$PREFIX" >> $GITHUB_OUTPUT
-          echo "Deploying to: $ENV (namespace: $NAMESPACE)"
+          echo "==> Deploying to: $ENV (namespace: $NAMESPACE)"
       
       - name: Show what changed
         run: |
