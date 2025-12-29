@@ -10,3 +10,11 @@
 # Temp files
 *.log
 *.tmp
+*.swp
+*.swo
+*~
+*.bak
+
+# Build artifacts
+*.yaml.bak
+kustomize-output/
