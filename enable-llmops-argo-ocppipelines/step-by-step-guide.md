@@ -73,6 +73,39 @@ git --version
 kustomize version
 ```
 
+### 1.5 Understanding OpenShift GitOps Namespaces
+
+**Important:** There are multiple namespaces involved in this setup. Understanding them prevents confusion:
+
+| Namespace | Purpose | What's Inside | When to Use |
+|-----------|---------|---------------|-------------|
+| `openshift-gitops-operator` or `openshift-operators` | Operator installation | GitOps operator pod | Checking operator status |
+| `openshift-gitops` | ArgoCD instance | ArgoCD server, Application CRs, secrets, routes | All ArgoCD operations |
+| `llmops-dev` | Dev environment | Model deployments (InferenceService, etc.) | Dev workloads |
+| `llmops-staging` | Staging environment | Model deployments | Staging workloads |
+| `llmops-prod` | Production environment | Model deployments | Production workloads |
+
+**Key Points:**
+- ✅ ArgoCD Application resources go in `openshift-gitops` namespace
+- ✅ All ArgoCD commands use `openshift-gitops` namespace
+- ✅ Your model workloads are deployed to `llmops-*` namespaces
+- ❌ Don't confuse operator namespace with ArgoCD namespace
+
+**Quick Verification:**
+```bash
+# Check operator namespace (either location is fine)
+oc get pods -n openshift-gitops-operator 2>/dev/null || \
+oc get pods -n openshift-operators | grep gitops
+
+# Check ArgoCD namespace (this is what you'll use)
+oc get pods -n openshift-gitops
+
+# Expected output in openshift-gitops:
+# openshift-gitops-server-*
+# openshift-gitops-repo-server-*
+# openshift-gitops-application-controller-*
+```
+
 ---
 
 ## Step 2: Understand the GitOps Architecture
@@ -186,10 +219,11 @@ oc get csv -n openshift-operators | grep gitops
 **Verify Installation:**
 
 ```bash
-# Check operator is installed
-oc get subscription openshift-gitops-operator -n openshift-operators
+# Check operator is installed (in openshift-operators or openshift-gitops-operator namespace)
+oc get subscription openshift-gitops-operator -n openshift-operators || \
+oc get subscription openshift-gitops-operator -n openshift-gitops-operator
 
-# Check openshift-gitops namespace was created
+# Check openshift-gitops namespace was created (where ArgoCD runs)
 oc get namespace openshift-gitops
 
 # Check ArgoCD Server is running
@@ -197,6 +231,14 @@ oc get pods -n openshift-gitops
 ```
 
 **Expected output:** All pods in `openshift-gitops` namespace should be `Running`.
+
+**Important Namespace Distinction:**
+- **Operator namespace**: `openshift-gitops-operator` or `openshift-operators` (where the GitOps operator pod runs)
+- **ArgoCD namespace**: `openshift-gitops` (where ArgoCD components run - server, repo-server, application-controller)
+- **Application namespace**: `openshift-gitops` (where ArgoCD Application CRs are created)
+- **Target namespaces**: `llmops-dev`, `llmops-staging`, `llmops-prod` (where your models are deployed)
+
+You will use `openshift-gitops` namespace for all ArgoCD operations, regardless of where the operator is installed.
 
 ### 3.2 Install OpenShift Pipelines Operator
 
@@ -437,6 +479,11 @@ spec:
     repoURL: https://github.com/YOUR_USERNAME/YOUR_REPO.git  # ← Change this line
     targetRevision: main
     path: enable-llmops-argo-ocppipelines/deploy_model/overlays/dev
+  
+  # Destination: Target namespace in OpenShift
+  destination:
+    server: https://kubernetes.default.svc  # ← Keep this as-is (internal cluster address)
+    namespace: llmops-dev
 ```
 
 **In `argocd-apps/staging-application.yaml`:**
@@ -447,6 +494,11 @@ spec:
     repoURL: https://github.com/YOUR_USERNAME/YOUR_REPO.git  # ← Change this line
     targetRevision: main
     path: enable-llmops-argo-ocppipelines/deploy_model/overlays/staging
+  
+  # Destination: Target namespace in OpenShift
+  destination:
+    server: https://kubernetes.default.svc  # ← Keep this as-is (internal cluster address)
+    namespace: llmops-staging
 ```
 
 **In `argocd-apps/production-application.yaml`:**
@@ -457,6 +509,11 @@ spec:
     repoURL: https://github.com/YOUR_USERNAME/YOUR_REPO.git  # ← Change this line
     targetRevision: main
     path: enable-llmops-argo-ocppipelines/deploy_model/overlays/production
+  
+  # Destination: Target namespace in OpenShift
+  destination:
+    server: https://kubernetes.default.svc  # ← Keep this as-is (internal cluster address)
+    namespace: llmops-prod
 ```
 
 Replace `YOUR_USERNAME` with your GitHub username and `YOUR_REPO` with your repository name.
@@ -465,6 +522,57 @@ Replace `YOUR_USERNAME` with your GitHub username and `YOUR_REPO` with your repo
 ```yaml
 repoURL: https://github.com/jsmith/llmops-gitops-demo.git
 ```
+
+---
+
+### 5.3.1 Understanding the Destination Field
+
+**Important:** You typically do **NOT** need to change the `destination` section.
+
+**What is `server: https://kubernetes.default.svc`?**
+
+This is the **internal Kubernetes API server address**. Since ArgoCD is running **inside** your OpenShift cluster, it uses this internal DNS name to communicate with the cluster's API server. This is more efficient and secure than using the external cluster URL.
+
+**When to keep it as-is:**
+- ✅ Deploying to the **same cluster** where ArgoCD is running (your scenario)
+- ✅ All three environments (dev, staging, prod) are in the **same OpenShift cluster**
+
+**When to change it:**
+- ❌ Only if deploying to a **different/remote cluster**
+
+**Example: Deploying to a Remote Cluster**
+
+If you wanted ArgoCD to deploy to a **different** OpenShift cluster (e.g., a separate production cluster), you would change it to:
+
+```yaml
+# Example: Deploying to a remote production cluster
+destination:
+  server: https://api.prod-cluster.example.com:6443  # External API server URL
+  namespace: llmops-prod
+```
+
+**To add a remote cluster to ArgoCD:**
+```bash
+# Login to the remote cluster
+oc login https://api.prod-cluster.example.com:6443 --token=REMOTE_CLUSTER_TOKEN
+
+# Add the cluster to ArgoCD
+argocd cluster add prod-cluster-context --name prod-cluster
+
+# Update the Application manifest
+# destination:
+#   server: https://api.prod-cluster.example.com:6443
+#   namespace: llmops-prod
+```
+
+**For this demo, keep all destinations as:**
+```yaml
+destination:
+  server: https://kubernetes.default.svc  # Internal address - do not change
+  namespace: llmops-dev  # (or llmops-staging, llmops-prod)
+```
+
+---
 
 ### 5.4 Push to GitHub
 
@@ -499,6 +607,17 @@ git push -u origin main
 ## Step 6: Deploy ArgoCD Applications
 
 Now that your code is in Git, create the ArgoCD Applications that will monitor and deploy your models.
+
+**Important:** ArgoCD Application resources are created in the `openshift-gitops` namespace (where ArgoCD runs), NOT in the operator namespace or target namespaces. The Application manifests already have the correct namespace configured:
+
+```yaml
+metadata:
+  name: llmops-dev
+  namespace: openshift-gitops  # ← ArgoCD namespace (correct!)
+spec:
+  destination:
+    namespace: llmops-dev        # ← Target namespace for deployments
+```
 
 ### 6.1 Apply ArgoCD Applications (Automated)
 

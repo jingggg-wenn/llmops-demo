@@ -562,10 +562,16 @@ This will be covered in a future update.
 
 **Detailed Setup Guide:**
 - [step-by-step-guide.md](./step-by-step-guide.md) - Complete walkthrough
+- [NAMESPACE-GUIDE.md](./NAMESPACE-GUIDE.md) - Understanding OpenShift GitOps namespaces
 
 **Setup Scripts:**
 - [setup-argocd.sh](./setup_scripts/setup-argocd.sh) - Automated setup
 - [apply-argocd-apps.sh](./setup_scripts/apply-argocd-apps.sh) - Deploy applications
+
+**Additional Guides:**
+- [QUICK-START.md](./QUICK-START.md) - Quick reference
+- [COMPARISON-GITHUBACTIONS-ARGOCD.md](./COMPARISON-GITHUBACTIONS-ARGOCD.md) - Comparison with GitHub Actions
+- [IMPLEMENTATION-SUMMARY.md](./IMPLEMENTATION-SUMMARY.md) - Implementation overview
 
 **External Resources:**
 - [ArgoCD Documentation](https://argo-cd.readthedocs.io/)
