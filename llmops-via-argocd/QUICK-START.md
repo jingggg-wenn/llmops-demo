@@ -26,7 +26,7 @@ oc get pods -n openshift-gitops
 ### 2. Run Setup Script
 
 ```bash
-cd enable-llmops-argo-ocppipelines/setup_scripts
+cd llmops-via-argocd/setup_scripts
 chmod +x setup-argocd.sh
 ./setup-argocd.sh
 ```

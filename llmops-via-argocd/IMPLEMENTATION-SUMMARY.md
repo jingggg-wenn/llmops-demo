@@ -1,6 +1,6 @@
 # Implementation Summary: GitOps LLMOps with ArgoCD
 
-This document summarizes what has been created in the `enable-llmops-argo-ocppipelines/` folder.
+This document summarizes what has been created in the `llmops-via-argocd/` folder.
 
 ## What Was Built
 
@@ -9,7 +9,7 @@ A complete GitOps-based LLMOps implementation using ArgoCD for deploying LLM mod
 ## Folder Structure
 
 ```
-enable-llmops-argo-ocppipelines/
+llmops-via-argocd/
 ├── argocd-apps/                          # ArgoCD Application definitions
 │   ├── dev-application.yaml              # Dev environment (auto-sync)
 │   ├── staging-application.yaml          # Staging environment (manual sync)

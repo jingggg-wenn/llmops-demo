@@ -293,7 +293,7 @@ oc get pods -n openshift-pipelines
 
 ```bash
 # Navigate to the setup scripts directory
-cd enable-llmops-argo-ocppipelines/setup_scripts
+cd llmops-via-argocd/setup_scripts
 
 # Make script executable
 chmod +x setup-argocd.sh
@@ -402,8 +402,8 @@ echo "Password: $ARGOCD_PASSWORD"
 ### 5.2 Initialize Git Repository Locally
 
 ```bash
-# Navigate to your enable-llmops-argo-ocppipelines directory
-cd /path/to/rhoai-env-jw/enable-llmops-argo-ocppipelines
+# Navigate to your llmops-via-argocd directory
+cd /path/to/rhoai-env-jw/llmops-via-argocd
 
 # Initialize git (if not already done)
 git init
@@ -478,7 +478,7 @@ spec:
   source:
     repoURL: https://github.com/YOUR_USERNAME/YOUR_REPO.git  # ← Change this line
     targetRevision: main
-    path: enable-llmops-argo-ocppipelines/deploy_model/overlays/dev
+    path: llmops-via-argocd/deploy_model/overlays/dev
   
   # Destination: Target namespace in OpenShift
   destination:
@@ -493,7 +493,7 @@ spec:
   source:
     repoURL: https://github.com/YOUR_USERNAME/YOUR_REPO.git  # ← Change this line
     targetRevision: main
-    path: enable-llmops-argo-ocppipelines/deploy_model/overlays/staging
+    path: llmops-via-argocd/deploy_model/overlays/staging
   
   # Destination: Target namespace in OpenShift
   destination:
@@ -508,7 +508,7 @@ spec:
   source:
     repoURL: https://github.com/YOUR_USERNAME/YOUR_REPO.git  # ← Change this line
     targetRevision: main
-    path: enable-llmops-argo-ocppipelines/deploy_model/overlays/production
+    path: llmops-via-argocd/deploy_model/overlays/production
   
   # Destination: Target namespace in OpenShift
   destination:
@@ -623,7 +623,7 @@ spec:
 
 ```bash
 # Navigate to setup scripts
-cd enable-llmops-argo-ocppipelines/setup_scripts
+cd llmops-via-argocd/setup_scripts
 
 # Make script executable
 chmod +x apply-argocd-apps.sh

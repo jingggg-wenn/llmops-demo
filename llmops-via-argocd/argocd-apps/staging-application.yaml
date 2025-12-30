@@ -13,7 +13,7 @@ spec:
   source:
     repoURL: https://github.com/jingggg-wenn/llmops-demo.git
     targetRevision: main
-    path: enable-llmops-argo-ocppipelines/deploy_model/overlays/staging
+    path: llmops-via-argocd/deploy_model/overlays/staging
   
   # Destination: Target namespace in OpenShift
   destination:

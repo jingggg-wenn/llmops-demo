@@ -608,5 +608,5 @@ This is a demonstration project for educational purposes.
 **Last Updated:** 2024-12-29
 **Target:** OpenShift 4.x with Red Hat OpenShift AI (RHOAI), KServe, and OpenShift GitOps
 **Demo Model:** Qwen 2.5 0.5B Instruct
-**Repository:** rhoai-env-jw/enable-llmops-argo-ocppipelines
+**Repository:** rhoai-env-jw/llmops-via-argocd
 
