@@ -1,8 +1,8 @@
-# Implementation Summary: GitOps LLMOps with ArgoCD
+# Folder Structure and File Contents
 
-This document summarizes what has been created in the `llmops-via-argocd/` folder.
+This document describes the folder structure and contents of the `llmops-via-argocd/` directory.
 
-## What Was Built
+## Overview
 
 A complete GitOps-based LLMOps implementation using ArgoCD for deploying LLM models to Red Hat OpenShift AI, replacing the previous GitHub Actions push-based approach with a pull-based GitOps workflow.
 
@@ -14,6 +14,17 @@ llmops-via-argocd/
 │   ├── dev-application.yaml              # Dev environment (auto-sync)
 │   ├── staging-application.yaml          # Staging environment (manual sync)
 │   └── production-application.yaml       # Production environment (manual sync)
+│
+├── argocd-rbac/                          # ArgoCD RBAC configuration
+│   ├── apply-rbac-via-cr.sh              # Script to apply RBAC via ArgoCD CR
+│   ├── verify-rbac.sh                    # Script to verify RBAC configuration
+│   ├── diagnose-rbac-issue.sh            # Script to diagnose RBAC issues
+│   └── README.md                         # RBAC setup documentation
+│
+├── argocd-setup-healthcheck/             # ArgoCD health check configuration
+│   ├── apply-health-check-via-cr.sh      # Script to apply health checks
+│   ├── verify-health-check.sh            # Script to verify health checks
+│   └── README.md                         # Health check documentation
 │
 ├── deploy_model/                         # Kustomize configurations
 │   ├── base/                             # Base model configuration (shared)
@@ -35,10 +46,10 @@ llmops-via-argocd/
 │   └── apply-argocd-apps.sh              # Apply ArgoCD Applications
 │
 ├── README.md                             # Main documentation
-├── step-by-step-guide.md                 # Detailed setup guide (1400+ lines)
-├── QUICK-START.md                        # Quick reference guide
-├── COMPARISON.md                         # GitHub Actions vs ArgoCD comparison
-└── IMPLEMENTATION-SUMMARY.md             # This file
+├── step-by-step-guide.md                 # Detailed setup guide (1900+ lines)
+├── NAMESPACE-GUIDE.md                    # Namespace organization guide
+├── COMPARISON-GITHUBACTIONS-ARGOCD.md    # GitHub Actions vs ArgoCD comparison
+└── FOLDER-STRUCTURE.md                   # This file
 ```
 
 ## Key Components
@@ -65,7 +76,44 @@ Three ArgoCD Application resources that define how ArgoCD manages each environme
 - Sync policy: **Manual** (requires approval)
 - Purpose: Production workloads
 
-### 2. Kustomize Configurations (deploy_model/)
+### 2. ArgoCD RBAC Configuration (argocd-rbac/)
+
+Scripts and documentation for configuring ArgoCD RBAC to enable OpenShift SSO access:
+
+**apply-rbac-via-cr.sh:**
+- Configures RBAC in ArgoCD CR (operator-managed approach)
+- Automatically detects your username
+- Grants admin access to your user
+- Sets default policy to readonly for all authenticated users
+- Defines custom roles: llmops-admin, llmops-developer, llmops-viewer
+
+**verify-rbac.sh:**
+- Verifies RBAC is correctly configured
+- Checks ArgoCD CR and ConfigMap
+- Validates user access
+
+**diagnose-rbac-issue.sh:**
+- Diagnoses RBAC issues
+- Shows current configuration
+- Checks user and group membership
+
+### 3. ArgoCD Health Check Configuration (argocd-setup-healthcheck/)
+
+Scripts and documentation for configuring custom health checks for KServe InferenceService:
+
+**apply-health-check-via-cr.sh:**
+- Configures health checks in ArgoCD CR (operator-managed approach)
+- Adds custom health check for InferenceService
+- Adds custom health check for ServingRuntime
+- Waits for operator to propagate to ConfigMap
+- Restarts ArgoCD server
+
+**verify-health-check.sh:**
+- Verifies health checks are correctly configured
+- Checks ArgoCD CR and ConfigMap
+- Shows application health status
+
+### 4. Kustomize Configurations (deploy_model/)
 
 **Base configuration** defines the core model deployment:
 - InferenceService: Qwen 2.5 0.5B Instruct model
@@ -78,7 +126,7 @@ Three ArgoCD Application resources that define how ArgoCD manages each environme
 - Different name prefixes (dev-, staging-, prod-)
 - Different display names
 
-### 3. Setup Scripts (setup_scripts/)
+### 5. Setup Scripts (setup_scripts/)
 
 **setup-argocd.sh:**
 - Verifies OpenShift GitOps Operator is installed
@@ -91,7 +139,7 @@ Three ArgoCD Application resources that define how ArgoCD manages each environme
 - Verifies applications were created
 - Shows ArgoCD access information
 
-### 4. Documentation
+### 6. Documentation
 
 **README.md** (main documentation):
 - Overview of GitOps approach
@@ -102,22 +150,25 @@ Three ArgoCD Application resources that define how ArgoCD manages each environme
 - Troubleshooting
 
 **step-by-step-guide.md** (detailed guide):
-- 10-step implementation guide
+- 13-step implementation guide
 - Prerequisites check
 - Operator installation
 - Namespace setup
 - Git repository configuration
 - ArgoCD application deployment
+- Health check configuration
+- RBAC configuration
 - Testing workflows
 - Monitoring and troubleshooting
 - Best practices
 
-**QUICK-START.md** (quick reference):
-- Condensed 5-minute setup
-- Key commands
-- Quick troubleshooting
+**NAMESPACE-GUIDE.md** (namespace organization):
+- Explanation of namespace structure
+- Operator vs ArgoCD vs target namespaces
+- Common confusion points
+- Verification commands
 
-**COMPARISON.md** (detailed comparison):
+**COMPARISON-GITHUBACTIONS-ARGOCD.md** (detailed comparison):
 - GitHub Actions vs ArgoCD feature comparison
 - Workflow comparisons
 - Use case scenarios
@@ -138,7 +189,7 @@ Three ArgoCD Application resources that define how ArgoCD manages each environme
    - ArgoCD ensures cluster matches Git
 
 3. **Continuous Reconciliation**
-   - ArgoCD polls Git every 3 minutes
+   - ArgoCD polls Git every 3 minutes (configurable)
    - Detects and corrects drift
    - Self-healing for dev environment
 
@@ -146,12 +197,23 @@ Three ArgoCD Application resources that define how ArgoCD manages each environme
    - Dev: Auto-syncs on Git changes
    - Staging/Prod: Manual approval required
 
+### Operator-Managed Configurations
+
+All ArgoCD configurations use the **operator-managed approach**:
+
+1. **Health Checks** - Configured in ArgoCD CR (`spec.resourceHealthChecks`)
+2. **RBAC** - Configured in ArgoCD CR (`spec.rbac`)
+3. **Polling Interval** - Configured in ArgoCD CR (`spec.repo.env`)
+
+The operator automatically propagates these to ConfigMaps, ensuring changes persist across reconciliation.
+
 ### Security Improvements
 
 - No cluster credentials stored in GitHub
 - ArgoCD runs inside OpenShift cluster
 - Uses OpenShift's native RBAC
 - Full audit trail in Git and ArgoCD
+- OpenShift SSO integration for user access
 
 ### Operational Benefits
 
@@ -160,6 +222,7 @@ Three ArgoCD Application resources that define how ArgoCD manages each environme
 - **Rich Visualization**: Resource tree view in ArgoCD
 - **Manual Approval Gates**: Control production deployments
 - **Change Preview**: See diff before deploying
+- **Health Monitoring**: Custom health checks for KServe resources
 
 ## How It Works
 
@@ -237,11 +300,19 @@ syncPolicy:
    - Apply three Application resources
    - Verify in ArgoCD UI
 
-5. **Initial Sync**
+5. **Configure Health Checks**
+   - Run health check setup script
+   - Verify applications show "Healthy"
+
+6. **Configure RBAC (Optional)**
+   - Run RBAC setup script
+   - Enable OpenShift SSO access
+
+7. **Initial Sync**
    - Sync dev environment
    - Optionally sync staging/production
 
-6. **Test Workflow**
+8. **Test Workflow**
    - Make changes to overlays
    - Push to Git
    - Watch ArgoCD sync
@@ -252,173 +323,11 @@ syncPolicy:
 - Setup script: 2 minutes
 - Git configuration: 5 minutes
 - ArgoCD application deployment: 2 minutes
+- Health check configuration: 2 minutes
+- RBAC configuration: 2 minutes
 - Initial sync: 3-5 minutes per environment
 
-**Total: 20-30 minutes**
-
-## Usage Examples
-
-### Example 1: Update Dev Environment
-
-```bash
-# Make changes
-git checkout -b feature/increase-cpu
-vim deploy_model/overlays/dev/kustomization.yaml
-# Change CPU limit from "2" to "3"
-
-# Commit and push
-git add deploy_model/overlays/dev/
-git commit -m "Dev: Increase CPU to 3 cores"
-git push -u origin feature/increase-cpu
-
-# Create and merge PR on GitHub
-
-# ArgoCD automatically syncs within 3 minutes
-# No manual intervention needed
-```
-
-### Example 2: Update Production Environment
-
-```bash
-# Make changes
-git checkout -b feature/prod-release-v1
-vim deploy_model/overlays/production/kustomization.yaml
-# Update display name to v1.0
-
-# Commit and push
-git add deploy_model/overlays/production/
-git commit -m "Production: Deploy v1.0 release"
-git push -u origin feature/prod-release-v1
-
-# Create PR with detailed description
-# Request team review
-# After approval, merge to main
-
-# ArgoCD detects change but does NOT auto-deploy
-# Go to ArgoCD UI:
-# 1. Click llmops-production
-# 2. Click "APP DIFF" to review changes
-# 3. Click "SYNC" to deploy
-# 4. Monitor deployment
-```
-
-### Example 3: Rollback Production
-
-**Via ArgoCD UI (fastest):**
-1. Open ArgoCD UI
-2. Click on `llmops-production`
-3. Click "HISTORY AND ROLLBACK" tab
-4. Select previous successful deployment
-5. Click "ROLLBACK"
-6. ArgoCD reverts to previous Git commit
-
-**Time: 1-2 minutes**
-
-## Monitoring
-
-### ArgoCD Dashboard
-
-Access at: `https://openshift-gitops-server-openshift-gitops.apps.cluster...`
-
-**Features:**
-- Application list with sync status
-- Resource tree visualization
-- Health status monitoring
-- Change history
-- Diff viewer
-- One-click rollback
-
-### CLI Monitoring
-
-```bash
-# View all applications
-oc get applications -n openshift-gitops
-
-# Watch application status
-oc get application llmops-dev -n openshift-gitops -w
-
-# Check InferenceServices
-oc get inferenceservice --all-namespaces | grep llmops
-
-# Check routes
-oc get route --all-namespaces | grep llmops
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Application shows OutOfSync**
-   - Expected for staging/production (manual sync)
-   - Review changes in ArgoCD UI
-   - Click SYNC to deploy
-
-2. **ArgoCD cannot access Git repository**
-   - For private repos, add Git credentials
-   - Create secret with GitHub token
-   - Label secret for ArgoCD
-
-3. **InferenceService not healthy**
-   - Check pod status: `oc get pods -n llmops-dev`
-   - Check events: `oc describe inferenceservice ...`
-   - Check logs: `oc logs <pod-name>`
-
-4. **Auto-sync not working**
-   - Verify sync policy in Application
-   - Check ArgoCD polling interval (default 3 min)
-   - Manually trigger sync to test
-
-## Next Steps: Phase 2
-
-After mastering ArgoCD, add OpenShift Pipelines for:
-
-**Pre-Deployment Validation:**
-- Kustomize build validation
-- YAML linting
-- Security scanning
-- Custom tests
-
-**Workflow:**
-```
-Developer → Git Push → Tekton Pipeline (validate) → Git Repo
-                                                        ↑
-                                        [ArgoCD watches and deploys]
-```
-
-**Benefits:**
-- Catch errors before deployment
-- Enforce quality gates
-- Block PR merge if validation fails
-- Automated testing
-
-## Comparison with Previous Approach
-
-### GitHub Actions (Old)
-
-**Pros:**
-- Simple push-based deployment
-- Familiar CI/CD pattern
-
-**Cons:**
-- No state tracking
-- No drift detection
-- Cluster credentials in GitHub
-- No visualization
-- Manual rollback process
-
-### ArgoCD GitOps (New)
-
-**Pros:**
-- True GitOps with continuous reconciliation
-- Automatic drift detection
-- Credentials stay in cluster
-- Rich visualization
-- One-click rollback
-- Manual approval gates
-
-**Cons:**
-- Slightly more complex setup
-- New concepts to learn
+**Total: 25-35 minutes**
 
 ## Success Criteria
 
@@ -428,6 +337,7 @@ You'll know the implementation is successful when:
 - ✅ Dev environment auto-syncs when you push changes
 - ✅ Staging/Production show "OutOfSync" and require manual approval
 - ✅ You can view all resources in ArgoCD UI
+- ✅ You can login via OpenShift SSO
 - ✅ You can rollback via ArgoCD UI
 - ✅ Drift detection works (try manually changing a resource)
 - ✅ All InferenceServices are accessible via routes
@@ -438,13 +348,16 @@ You'll know the implementation is successful when:
 
 - `README.md` - Main documentation
 - `step-by-step-guide.md` - Detailed setup guide
-- `QUICK-START.md` - Quick reference
-- `COMPARISON.md` - GitHub Actions vs ArgoCD
+- `NAMESPACE-GUIDE.md` - Namespace organization
+- `COMPARISON-GITHUBACTIONS-ARGOCD.md` - Comparison with GitHub Actions
+- `FOLDER-STRUCTURE.md` - This file
 
 ### Setup Scripts
 
 - `setup_scripts/setup-argocd.sh` - Automated setup
 - `setup_scripts/apply-argocd-apps.sh` - Deploy applications
+- `argocd-setup-healthcheck/apply-health-check-via-cr.sh` - Configure health checks
+- `argocd-rbac/apply-rbac-via-cr.sh` - Configure RBAC
 
 ### External Resources
 
@@ -464,14 +377,16 @@ This implementation provides a production-ready GitOps workflow for LLMOps on Op
 - **Rich Visualization**: ArgoCD dashboard for monitoring
 - **Easy Rollback**: One-click revert to previous version
 - **Better Security**: No cluster credentials outside cluster
+- **Custom Health Checks**: Proper status for KServe resources
+- **OpenShift SSO Integration**: User access via SSO
 
 The implementation is simple to use (just push to Git), yet powerful enough for production workloads with multiple environments and approval workflows.
 
 ---
 
-**Created:** 2024-12-29
-**Implementation Time:** ~2 hours
-**Lines of Documentation:** ~3000+
-**Files Created:** 20+
+**Created:** 2025-12-29
+**Last Updated:** 2025-12-30
+**Lines of Documentation:** ~3500+
+**Files Created:** 25+
 **Ready for:** Production use on OpenShift AI 3.x with KServe
 

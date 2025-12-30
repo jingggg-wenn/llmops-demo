@@ -11,27 +11,27 @@ This implementation showcases:
 - **Automated drift detection** and self-healing
 - **Manual approval gates** for staging and production
 - **Rich visualization** via ArgoCD dashboard
-- **Progressive rollout strategy** from dev → staging → production
+- **Progressive rollout strategy** from dev to staging to production
 - **No cluster credentials outside cluster** (more secure than GitHub Actions)
 
 ## Architecture
 
 ```
 ┌─────────────┐      ┌──────────────┐      ┌────────────────────────┐
-│  Developer  │─────▶│    GitHub    │◀─────│   ArgoCD (watches)     │
+│  Developer  │----->│    GitHub    │<-----│   ArgoCD (watches)     │
 │             │      │  Repository  │      │   (in OpenShift)       │
 └─────────────┘      └──────────────┘      └────────────┬───────────┘
                                                          │
                           ┌──────────────────────────────┴─────────────┐
                           │                                            │
-                          ▼                                            ▼
+                          v                                            v
                   ┌───────────────┐                          ┌─────────────────┐
                   │  OpenShift    │                          │   OpenShift     │
                   │  llmops-dev   │                          │ llmops-staging  │
                   │  (auto-sync)  │                          │ (manual-sync)   │
                   └───────────────┘                          └─────────────────┘
                                                                       │
-                                                                      ▼
+                                                                      v
                                                           ┌─────────────────┐
                                                           │   OpenShift     │
                                                           │  llmops-prod    │
@@ -65,58 +65,6 @@ This implementation showcases:
 
 ---
 
-## Repository Structure
-
-```
-.
-├── argocd-apps/
-│   ├── dev-application.yaml          # ArgoCD Application for dev (auto-sync)
-│   ├── staging-application.yaml      # ArgoCD Application for staging (manual)
-│   └── production-application.yaml   # ArgoCD Application for production (manual)
-├── deploy_model/
-│   ├── base/                         # Base configuration (shared)
-│   │   ├── inferenceservice.yaml     # Model definition
-│   │   ├── servingruntime.yaml       # vLLM runtime config
-│   │   ├── oci-data-connection.yaml  # Model source
-│   │   └── kustomization.yaml
-│   ├── overlays/                     # Environment-specific configs
-│   │   ├── dev/                      # Development environment
-│   │   │   └── kustomization.yaml
-│   │   ├── staging/                  # Staging environment
-│   │   │   └── kustomization.yaml
-│   │   └── production/               # Production environment
-│   │       └── kustomization.yaml
-├── setup_scripts/                    # Setup automation
-│   ├── setup-argocd.sh               # Automated ArgoCD setup
-│   └── apply-argocd-apps.sh          # Apply ArgoCD applications
-├── step-by-step-guide.md             # Detailed setup guide
-└── README.md                         # This file
-```
-
----
-
-## Environment Configurations
-
-This demo uses **Kustomize overlays** to manage three environments with different resource allocations:
-
-| Environment | CPU Limit | Memory Limit | Replicas | Sync Policy | Purpose |
-|-------------|-----------|--------------|----------|-------------|---------|
-| **Dev** | 2 cores | 6Gi | 1 (fixed) | Auto-sync | Development & testing |
-| **Staging** | 3 cores | 8Gi | 1-2 (autoscaling) | Manual sync | Pre-production validation |
-| **Production** | 4 cores | 12Gi | 2-3 (autoscaling + HA) | Manual sync | Production workloads |
-
-**Name Prefixes:**
-- Dev: `dev-qwen25-05b-instruct`
-- Staging: `staging-qwen25-05b-instruct`
-- Production: `prod-qwen25-05b-instruct`
-
-**Sync Policies:**
-- **Dev**: Auto-sync enabled - ArgoCD automatically deploys when Git changes
-- **Staging**: Manual sync required - Review changes before deploying
-- **Production**: Manual sync required - Requires explicit approval
-
----
-
 ## Prerequisites
 
 - OpenShift cluster with Red Hat OpenShift AI installed
@@ -127,108 +75,6 @@ This demo uses **Kustomize overlays** to manage three environments with differen
 - GitHub account
 - `oc` CLI installed locally
 - `kustomize` installed (optional, for local testing)
-
----
-
-## Quick Start
-
-### 1. Install Operators
-
-Install via OpenShift Console → OperatorHub:
-- **Red Hat OpenShift GitOps** (provides ArgoCD)
-- **Red Hat OpenShift Pipelines** (provides Tekton)
-
-Or via CLI:
-```bash
-# Install OpenShift GitOps
-oc apply -f - <<EOF
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: openshift-gitops-operator
-  namespace: openshift-operators
-spec:
-  channel: latest
-  name: openshift-gitops-operator
-  source: redhat-operators
-  sourceNamespace: openshift-marketplace
-EOF
-
-# Wait for installation
-oc get pods -n openshift-gitops
-```
-
-### 2. Run Setup Script
-
-```bash
-# Login to OpenShift
-oc login https://YOUR_CLUSTER_URL
-
-# Navigate to setup scripts
-cd setup_scripts
-
-# Run automated setup
-chmod +x setup-argocd.sh
-./setup-argocd.sh
-```
-
-This script:
-- Creates namespaces: `llmops-dev`, `llmops-staging`, `llmops-prod`
-- Configures ArgoCD permissions
-- Provides ArgoCD URL and admin password
-
-### 3. Update Git Repository URL
-
-```bash
-# Update ArgoCD applications with your Git repo
-YOUR_USERNAME="your-github-username"
-YOUR_REPO="your-repo-name"
-
-sed -i.bak "s|https://github.com/YOUR_USERNAME/YOUR_REPO.git|https://github.com/$YOUR_USERNAME/$YOUR_REPO.git|g" argocd-apps/*.yaml
-```
-
-### 4. Push to GitHub
-
-```bash
-# Initialize git and push
-git init
-git add .
-git commit -m "Initial commit: GitOps LLMOps with ArgoCD"
-git remote add origin https://github.com/$YOUR_USERNAME/$YOUR_REPO.git
-git branch -M main
-git push -u origin main
-```
-
-### 5. Deploy ArgoCD Applications
-
-```bash
-# Apply all three applications
-cd setup_scripts
-chmod +x apply-argocd-apps.sh
-./apply-argocd-apps.sh
-```
-
-### 6. Access ArgoCD Dashboard
-
-```bash
-# Get ArgoCD URL and password
-oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}'
-oc get secret openshift-gitops-cluster -n openshift-gitops -o jsonpath='{.data.admin\.password}' | base64 -d
-```
-
-Open the URL in your browser and login with username `admin` and the password.
-
-### 7. Sync Applications
-
-**Dev (auto-sync):**
-- Just push changes to Git
-- ArgoCD automatically syncs within 3 minutes
-
-**Staging/Production (manual sync):**
-1. Push changes to Git
-2. ArgoCD detects changes (shows OutOfSync)
-3. Review changes in ArgoCD UI
-4. Click "SYNC" to deploy
 
 ---
 
@@ -428,31 +274,31 @@ oc patch inferenceservice dev-qwen25-05b-instruct -n llmops-dev \
 
 ### Security
 
-✅ **No cluster credentials outside cluster** - ArgoCD runs inside OpenShift
-✅ **No tokens in GitHub Secrets** - More secure than GitHub Actions
-✅ **RBAC integration** - Use OpenShift's native RBAC
-✅ **Audit trail** - All changes tracked in Git and ArgoCD
+- **No cluster credentials outside cluster** - ArgoCD runs inside OpenShift
+- **No tokens in GitHub Secrets** - More secure than GitHub Actions
+- **RBAC integration** - Use OpenShift's native RBAC
+- **Audit trail** - All changes tracked in Git and ArgoCD
 
 ### Reliability
 
-✅ **Continuous reconciliation** - ArgoCD ensures cluster matches Git
-✅ **Drift detection** - Alerts when cluster state diverges
-✅ **Self-healing** - Automatically corrects drift (configurable)
-✅ **State tracking** - Always know what's deployed where
+- **Continuous reconciliation** - ArgoCD ensures cluster matches Git
+- **Drift detection** - Alerts when cluster state diverges
+- **Self-healing** - Automatically corrects drift (configurable)
+- **State tracking** - Always know what's deployed where
 
 ### Visibility
 
-✅ **Rich UI** - Visual representation of all resources
-✅ **Real-time status** - See deployment progress live
-✅ **Change history** - Full audit trail of deployments
-✅ **Easy rollback** - One-click revert to previous version
+- **Rich UI** - Visual representation of all resources
+- **Real-time status** - See deployment progress live
+- **Change history** - Full audit trail of deployments
+- **Easy rollback** - One-click revert to previous version
 
 ### Developer Experience
 
-✅ **Simple workflow** - Just push to Git
-✅ **No manual oc apply** - ArgoCD handles deployment
-✅ **Preview changes** - See diff before deploying
-✅ **Approval gates** - Manual sync for production
+- **Simple workflow** - Just push to Git
+- **No manual oc apply** - ArgoCD handles deployment
+- **Preview changes** - See diff before deploying
+- **Approval gates** - Manual sync for production
 
 ---
 
@@ -512,27 +358,17 @@ For more troubleshooting, see [step-by-step-guide.md](./step-by-step-guide.md#tr
 
 ## What This GitOps Demo Showcases
 
-✅ **True GitOps** - Git as single source of truth with continuous reconciliation
-
-✅ **Pull-Based Deployment** - ArgoCD pulls from Git, more secure than push
-
-✅ **Environment-Based Deployments** - Separate configs for dev/staging/prod
-
-✅ **Automated Drift Detection** - Ensures cluster always matches Git
-
-✅ **Manual Approval Gates** - Control production deployments
-
-✅ **Rich Visualization** - ArgoCD dashboard for monitoring
-
-✅ **Easy Rollback** - One-click revert to previous version
-
-✅ **Progressive Delivery** - Safe rollout pattern from dev → staging → production
-
-✅ **Configuration Management** - DRY principle with Kustomize base + overlays
-
-✅ **Reproducibility** - All configurations tracked in Git
-
-✅ **Security** - No cluster credentials outside cluster
+- **True GitOps** - Git as single source of truth with continuous reconciliation
+- **Pull-Based Deployment** - ArgoCD pulls from Git, more secure than push
+- **Environment-Based Deployments** - Separate configs for dev/staging/prod
+- **Automated Drift Detection** - Ensures cluster always matches Git
+- **Manual Approval Gates** - Control production deployments
+- **Rich Visualization** - ArgoCD dashboard for monitoring
+- **Easy Rollback** - One-click revert to previous version
+- **Progressive Delivery** - Safe rollout pattern from dev to staging to production
+- **Configuration Management** - DRY principle with Kustomize base + overlays
+- **Reproducibility** - All configurations tracked in Git
+- **Security** - No cluster credentials outside cluster
 
 ---
 
@@ -549,7 +385,7 @@ After you're comfortable with ArgoCD, add OpenShift Pipelines for pre-deployment
 
 **Workflow:**
 ```
-Developer → Git Push → Tekton Pipeline (validate) → Git Repo
+Developer -> Git Push -> Tekton Pipeline (validate) -> Git Repo
                                                         |
                                         [ArgoCD watches and deploys]
 ```
@@ -558,55 +394,8 @@ This will be covered in a future update.
 
 ---
 
-## Documentation
-
-**Detailed Setup Guide:**
-- [step-by-step-guide.md](./step-by-step-guide.md) - Complete walkthrough
-- [NAMESPACE-GUIDE.md](./NAMESPACE-GUIDE.md) - Understanding OpenShift GitOps namespaces
-
-**Setup Scripts:**
-- [setup-argocd.sh](./setup_scripts/setup-argocd.sh) - Automated setup
-- [apply-argocd-apps.sh](./setup_scripts/apply-argocd-apps.sh) - Deploy applications
-
-**Additional Guides:**
-- [QUICK-START.md](./QUICK-START.md) - Quick reference
-- [COMPARISON-GITHUBACTIONS-ARGOCD.md](./COMPARISON-GITHUBACTIONS-ARGOCD.md) - Comparison with GitHub Actions
-- [IMPLEMENTATION-SUMMARY.md](./IMPLEMENTATION-SUMMARY.md) - Implementation overview
-
-**External Resources:**
-- [ArgoCD Documentation](https://argo-cd.readthedocs.io/)
-- [OpenShift GitOps Documentation](https://docs.openshift.com/container-platform/latest/cicd/gitops/understanding-openshift-gitops.html)
-- [Kustomize Documentation](https://kustomize.io/)
-- [KServe Documentation](https://kserve.github.io/website/)
-
----
-
-## Model Information
-
-**Current Model**: Qwen 2.5 0.5B Instruct
-- **Source**: `quay.io/redhat-ai-services/modelcar-catalog:qwen2.5-0.5b-instruct`
-- **Size**: 0.5 billion parameters
-- **Inference Engine**: vLLM
-- **API**: OpenAI-compatible endpoints
-- **GPU Required**: 1x NVIDIA GPU
-
----
-
-## Contributing
-
-This is a demonstration project for educational purposes. Feel free to adapt it for your own LLMOps workflows.
-
----
-
-## License
-
-This is a demonstration project for educational purposes.
-
----
-
-**Created:** 2024-12-29
-**Last Updated:** 2024-12-29
+**Created:** 2025-12-29
+**Last Updated:** 2025-12-30
 **Target:** OpenShift 4.x with Red Hat OpenShift AI (RHOAI), KServe, and OpenShift GitOps
 **Demo Model:** Qwen 2.5 0.5B Instruct
-**Repository:** rhoai-env-jw/llmops-via-argocd
 

@@ -88,10 +88,12 @@ kustomize version
 | `llmops-prod` | Production environment | Model deployments | Production workloads |
 
 **Key Points:**
-- ✅ ArgoCD Application resources go in `openshift-gitops` namespace
-- ✅ All ArgoCD commands use `openshift-gitops` namespace
-- ✅ Your model workloads are deployed to `llmops-*` namespaces
-- ❌ Don't confuse operator namespace with ArgoCD namespace
+- ArgoCD Application resources go in `openshift-gitops` namespace
+- All ArgoCD commands use `openshift-gitops` namespace
+- Your model workloads are deployed to `llmops-*` namespaces
+- Don't confuse operator namespace with ArgoCD namespace
+
+**For a detailed namespace guide with troubleshooting:** See [NAMESPACE-GUIDE.md](./NAMESPACE-GUIDE.md)
 
 **Quick Verification:**
 ```bash
@@ -169,6 +171,8 @@ oc get pods -n openshift-gitops
 - `Secret` - Model storage credentials (OCI data connection)
 - `Route` - External model endpoint
 
+**For a detailed breakdown of all files and folders:** See [FOLDER-STRUCTURE.md](./FOLDER-STRUCTURE.md)
+
 ### 2.4 Environment Configurations
 
 | Environment | CPU Limit | Memory Limit | Replicas | Sync Policy | Purpose |
@@ -241,6 +245,8 @@ oc get pods -n openshift-gitops
 - **Target namespaces**: `llmops-dev`, `llmops-staging`, `llmops-prod` (where your models are deployed)
 
 You will use `openshift-gitops` namespace for all ArgoCD operations, regardless of where the operator is installed.
+
+**For detailed namespace explanations and common commands:** See [NAMESPACE-GUIDE.md](./NAMESPACE-GUIDE.md)
 
 ### 3.2 Install OpenShift Pipelines Operator
 
@@ -1411,6 +1417,8 @@ oc edit configmap argocd-notifications-cm -n openshift-gitops
 
 ## Troubleshooting
 
+**Note:** For namespace-related issues and confusion, see the comprehensive [NAMESPACE-GUIDE.md](./NAMESPACE-GUIDE.md).
+
 ### Issue 1: ArgoCD Application Shows OutOfSync but No Changes in Git
 
 **Problem:** Application status is OutOfSync even though Git hasn't changed.
@@ -1901,6 +1909,8 @@ Use this checklist to verify your GitOps setup is complete:
 
 **Related Files:**
 - [README.md](./README.md) - Project overview
+- [FOLDER-STRUCTURE.md](./FOLDER-STRUCTURE.md) - Folder structure and file contents
+- [NAMESPACE-GUIDE.md](./NAMESPACE-GUIDE.md) - Namespace organization and troubleshooting
 - [setup-argocd.sh](./setup_scripts/setup-argocd.sh) - Automated setup script
 - [apply-argocd-apps.sh](./setup_scripts/apply-argocd-apps.sh) - Apply ArgoCD applications
 
