@@ -16,7 +16,7 @@ patches:
     patch: |-
       - op: replace
         path: /metadata/annotations/openshift.io~1display-name
-        value: "qwen2.5-0.5b-staging-v3"
+        value: "qwen2.5-0.5b-staging"
       - op: add
         path: /metadata/annotations/serving.knative.dev~1revision-history-limit
         value: "3"
@@ -44,4 +44,11 @@ patches:
       - op: replace
         path: /spec/predictor/model/resources/requests/memory
         value: "6Gi"
-
+  # Patch ServingRuntime to change max-model-len for staging testing
+  - target:
+      kind: ServingRuntime
+      name: qwen25-05b-instruct
+    patch: |-
+      - op: replace
+        path: /spec/containers/0/args/4
+        value: "12000"
