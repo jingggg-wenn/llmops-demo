@@ -13,10 +13,11 @@ This guide walks you through setting up a production-ready LLMOps workflow using
 5. [Configure GitHub Repository](#step-5-configure-github-repository)
 6. [Deploy ArgoCD Applications](#step-6-deploy-argocd-applications)
 7. [Test GitOps Workflow - Dev Environment](#step-7-test-gitops-workflow---dev-environment)
-8. [Test Manual Sync - Staging Environment](#step-8-test-manual-sync---staging-environment)
-9. [Production Deployment Workflow](#step-9-production-deployment-workflow)
-10. [Monitor with ArgoCD Dashboard](#step-10-monitor-with-argocd-dashboard)
-11. [Troubleshooting](#troubleshooting)
+8. [Adjust ArgoCD Polling Interval (Optional)](#step-8-adjust-argocd-polling-interval-optional)
+9. [Test Manual Sync - Staging Environment](#step-9-test-manual-sync---staging-environment)
+10. [Production Deployment Workflow](#step-10-production-deployment-workflow)
+11. [Monitor with ArgoCD Dashboard](#step-11-monitor-with-argocd-dashboard)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -403,7 +404,7 @@ echo "Password: $ARGOCD_PASSWORD"
 
 ```bash
 # Navigate to your llmops-via-argocd directory
-cd /path/to/rhoai-env-jw/llmops-via-argocd
+cd /path/to/llmops-via-argocd
 
 # Initialize git (if not already done)
 git init
@@ -806,11 +807,48 @@ oc describe inferenceservice dev-qwen25-05b-instruct -n llmops-dev | grep "displ
 
 **Success!** You've just experienced GitOps in action - no manual `oc apply`, no GitHub Actions, just Git as the source of truth.
 
-### 7.5 Adjust ArgoCD Polling Interval (Optional)
+---
+
+## Step 8: Adjust ArgoCD Polling Interval (Optional)
 
 By default, ArgoCD polls Git repositories every **3 minutes**. You can change this to sync faster or slower.
 
 **Important:** In OpenShift GitOps, the `argocd-cm` ConfigMap is managed by the operator and will be overwritten if you edit it directly. You must configure settings through the **ArgoCD custom resource** instead.
+
+**Check Current Polling Interval:**
+
+```bash
+# Check if a custom polling interval is configured
+oc get argocd openshift-gitops -n openshift-gitops -o yaml | grep -A 10 "repo:"
+
+# If you see ARGOCD_RECONCILIATION_TIMEOUT, that's your current interval
+# If nothing is shown, the default is 180s (3 minutes)
+```
+
+**Important Note: Where the Polling Interval is Stored**
+
+The polling interval setting does **NOT** appear in the `argocd-cm` ConfigMap. Here's why:
+
+- **`argocd-cm` ConfigMap** contains ArgoCD application-level settings like:
+  - `timeout.reconciliation` (alternative method, not used in OpenShift GitOps)
+  - `resource.exclusions`
+  - `dex.config`
+  - Other ArgoCD configuration
+
+- **`ARGOCD_RECONCILIATION_TIMEOUT`** is an **environment variable** that lives in:
+  - The **ArgoCD CR** (`spec.repo.env`) ← Where you configure it
+  - The **repo-server deployment** ← Where it actually runs
+
+To verify where it's actually applied:
+
+```bash
+# Check the repo-server deployment environment variables
+oc get deployment openshift-gitops-repo-server -n openshift-gitops -o yaml | grep -A 2 "ARGOCD_RECONCILIATION_TIMEOUT"
+
+# You should see:
+# - name: ARGOCD_RECONCILIATION_TIMEOUT
+#   value: "60s"  (or whatever you configured)
+```
 
 **Change Global Polling Interval:**
 
@@ -883,11 +921,11 @@ argocd app sync llmops-dev
 
 ---
 
-## Step 8: Test Manual Sync - Staging Environment
+## Step 9: Test Manual Sync - Staging Environment
 
 Staging and production environments require **manual approval** before syncing.
 
-### 8.1 Make Changes to Staging Overlay
+### 9.1 Make Changes to Staging Overlay
 
 ```bash
 # Create feature branch for staging
@@ -912,7 +950,7 @@ git push -u origin feature/deploy-to-staging
 
 **Create and merge Pull Request on GitHub**
 
-### 8.2 ArgoCD Detects Change but Doesn't Auto-Deploy
+### 9.2 ArgoCD Detects Change but Doesn't Auto-Deploy
 
 After merging to main:
 
@@ -932,7 +970,7 @@ oc get application llmops-staging -n openshift-gitops
 
 This is the key difference - **manual approval required**.
 
-### 8.3 Review Changes in ArgoCD UI
+### 9.3 Review Changes in ArgoCD UI
 
 1. Click on **llmops-staging** application
 2. Click **"APP DIFF"** button to see what changed
@@ -940,7 +978,7 @@ This is the key difference - **manual approval required**.
    - CPU limit changed from "3" to "4"
 4. This gives you a chance to review before deploying
 
-### 8.4 Manually Sync Staging
+### 9.4 Manually Sync Staging
 
 **Via ArgoCD UI:**
 1. Click **"SYNC"** button
@@ -959,7 +997,7 @@ oc patch application llmops-staging -n openshift-gitops \
   --patch '{"operation": {"initiatedBy": {"username": "admin"}, "sync": {}}}'
 ```
 
-### 8.5 Verify Staging Deployment
+### 9.5 Verify Staging Deployment
 
 ```bash
 # Check InferenceService
@@ -975,11 +1013,11 @@ oc get route staging-qwen25-05b-instruct -n llmops-staging
 
 ---
 
-## Step 9: Production Deployment Workflow
+## Step 10: Production Deployment Workflow
 
 Production follows the same manual sync pattern as staging, but with additional safeguards.
 
-### 9.1 Progressive Rollout Pattern
+### 10.1 Progressive Rollout Pattern
 
 **Recommended workflow:**
 ```
@@ -1006,7 +1044,7 @@ Production follows the same manual sync pattern as staging, but with additional 
    └─ Monitor production deployment
 ```
 
-### 9.2 Deploy to Production
+### 10.2 Deploy to Production
 
 ```bash
 # Create production branch
@@ -1036,7 +1074,7 @@ git push -u origin feature/production-release-v1
 3. Add production deployment checklist
 4. After approval, merge to main
 
-### 9.3 Review Production Changes in ArgoCD
+### 10.3 Review Production Changes in ArgoCD
 
 1. Open ArgoCD UI
 2. Go to **llmops-production** application
@@ -1045,7 +1083,7 @@ git push -u origin feature/production-release-v1
 5. Verify the changes are correct
 6. Check that staging validation passed
 
-### 9.4 Manually Sync Production
+### 10.4 Manually Sync Production
 
 **Via ArgoCD UI:**
 1. Click **"SYNC"** button
@@ -1062,7 +1100,7 @@ argocd app sync llmops-production
 oc get inferenceservice -n llmops-prod -w
 ```
 
-### 9.5 Verify Production Deployment
+### 10.5 Verify Production Deployment
 
 ```bash
 # Check InferenceService status
@@ -1079,7 +1117,7 @@ curl https://$PROD_URL/v1/models
 watch -n 10 'oc get inferenceservice -n llmops-prod'
 ```
 
-### 9.6 Rollback Procedure (if needed)
+### 10.6 Rollback Procedure (if needed)
 
 If something goes wrong in production:
 
@@ -1110,9 +1148,9 @@ git push -u origin hotfix/rollback-production
 
 ---
 
-## Step 10: Monitor with ArgoCD Dashboard
+## Step 11: Monitor with ArgoCD Dashboard
 
-### 10.1 ArgoCD Dashboard Overview
+### 11.1 ArgoCD Dashboard Overview
 
 **Access the dashboard:**
 ```bash
@@ -1126,7 +1164,7 @@ oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.hos
 - **Health Status:** Healthy, Progressing, Degraded, Missing
 - **Last Sync:** Timestamp of last successful sync
 
-### 10.2 Application Details View
+### 11.2 Application Details View
 
 Click on any application to see:
 
@@ -1146,7 +1184,7 @@ Click on any application to see:
 - Errors and warnings
 - Resource changes
 
-### 10.3 Monitoring Sync Status
+### 11.3 Monitoring Sync Status
 
 **Via ArgoCD UI:**
 1. Main dashboard shows all applications at a glance
@@ -1166,7 +1204,7 @@ oc get applications -n openshift-gitops -w
 oc describe application llmops-dev -n openshift-gitops
 ```
 
-### 10.4 View Application Diff
+### 11.4 View Application Diff
 
 Before syncing, always review what changed:
 
@@ -1182,7 +1220,7 @@ Before syncing, always review what changed:
 argocd app diff llmops-staging
 ```
 
-### 10.5 View Sync History
+### 11.5 View Sync History
 
 **Via ArgoCD UI:**
 1. Click on application
@@ -1194,7 +1232,7 @@ argocd app diff llmops-staging
    - Sync status
    - Option to rollback
 
-### 10.6 Monitor All Environments
+### 11.6 Monitor All Environments
 
 **Dashboard view:**
 ```bash
@@ -1221,7 +1259,7 @@ oc get inferenceservice --all-namespaces | grep llmops
 oc get route --all-namespaces | grep llmops
 ```
 
-### 10.7 Set Up Notifications (Optional)
+### 11.7 Set Up Notifications (Optional)
 
 ArgoCD can send notifications on sync events:
 
