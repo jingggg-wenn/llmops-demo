@@ -713,7 +713,7 @@ Run the automated setup script:
 
 ```bash
 # Navigate to the health check directory
-cd llmops-via-argocd/argocd-custom-healthcheck
+cd llmops-via-argocd/argocd-setup-healthcheck
 
 # Make the scripts executable
 chmod +x apply-health-check-via-cr.sh verify-health-check.sh
@@ -819,9 +819,7 @@ spec:
 
 The ArgoCD operator then automatically propagates this to the `argocd-cm` ConfigMap. This is the correct, operator-approved method that persists across operator reconciliation.
 
-**For detailed documentation:** See [argocd-custom-healthcheck/README.md](argocd-custom-healthcheck/README.md)
-
-**Quick reference:** See [argocd-custom-healthcheck/QUICKSTART.md](argocd-custom-healthcheck/QUICKSTART.md)
+**For detailed documentation:** See [argocd-setup-healthcheck/README.md](argocd-setup-healthcheck/README.md)
 
 ---
 
@@ -1514,7 +1512,7 @@ oc logs $POD -n llmops-dev
 
 ```bash
 # Run the automated health check setup script
-cd llmops-via-argocd/argocd-custom-healthcheck
+cd llmops-via-argocd/argocd-setup-healthcheck
 chmod +x apply-health-check-via-cr.sh
 ./apply-health-check-via-cr.sh
 
@@ -1527,7 +1525,7 @@ oc get applications.argoproj.io -n openshift-gitops
 
 **Expected result:** Applications should now show "Healthy" status when InferenceService is ready.
 
-**For detailed documentation:** See `llmops-via-argocd/argocd-custom-healthcheck/README.md`
+**For detailed documentation:** See `llmops-via-argocd/argocd-setup-healthcheck/README.md`
 
 **Why this works:**
 - Configures health checks in the ArgoCD CR (`spec.resourceHealthChecks`)

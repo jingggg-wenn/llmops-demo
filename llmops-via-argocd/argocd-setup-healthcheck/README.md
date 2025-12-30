@@ -73,7 +73,7 @@ The operator sees the ConfigMap has drifted from the ArgoCD CR spec and reconcil
 The easiest and safest method:
 
 ```bash
-cd llmops-via-argocd/argocd-custom-healthcheck
+cd llmops-via-argocd/argocd-setup-healthcheck
 
 # Make the scripts executable
 chmod +x apply-health-check-via-cr.sh verify-health-check.sh
@@ -483,7 +483,7 @@ Add to `spec.resourceHealthChecks` in the ArgoCD CR:
 ### Quick Steps (Recommended)
 
 ```bash
-cd llmops-via-argocd/argocd-custom-healthcheck
+cd llmops-via-argocd/argocd-setup-healthcheck
 
 # Make scripts executable
 chmod +x apply-health-check-via-cr.sh verify-health-check.sh
