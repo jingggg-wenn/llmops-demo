@@ -39,8 +39,14 @@ fi
 # Apply dev application
 echo "Applying dev application..."
 if [ -f "$ARGOCD_APPS_DIR/dev-application.yaml" ]; then
-    oc apply -f "$ARGOCD_APPS_DIR/dev-application.yaml"
-    echo "✅ Dev application created"
+    if oc get application.argoproj.io llmops-dev -n openshift-gitops &> /dev/null; then
+        echo "  ℹ️  Application 'llmops-dev' already exists, updating..."
+        oc apply -f "$ARGOCD_APPS_DIR/dev-application.yaml"
+        echo "  ✅ Dev application updated"
+    else
+        oc apply -f "$ARGOCD_APPS_DIR/dev-application.yaml"
+        echo "  ✅ Dev application created"
+    fi
 else
     echo "❌ Error: dev-application.yaml not found"
     exit 1
@@ -50,8 +56,14 @@ echo ""
 # Apply staging application
 echo "Applying staging application..."
 if [ -f "$ARGOCD_APPS_DIR/staging-application.yaml" ]; then
-    oc apply -f "$ARGOCD_APPS_DIR/staging-application.yaml"
-    echo "✅ Staging application created"
+    if oc get application.argoproj.io llmops-staging -n openshift-gitops &> /dev/null; then
+        echo "  ℹ️  Application 'llmops-staging' already exists, updating..."
+        oc apply -f "$ARGOCD_APPS_DIR/staging-application.yaml"
+        echo "  ✅ Staging application updated"
+    else
+        oc apply -f "$ARGOCD_APPS_DIR/staging-application.yaml"
+        echo "  ✅ Staging application created"
+    fi
 else
     echo "❌ Error: staging-application.yaml not found"
     exit 1
@@ -61,8 +73,14 @@ echo ""
 # Apply production application
 echo "Applying production application..."
 if [ -f "$ARGOCD_APPS_DIR/production-application.yaml" ]; then
-    oc apply -f "$ARGOCD_APPS_DIR/production-application.yaml"
-    echo "✅ Production application created"
+    if oc get application.argoproj.io llmops-production -n openshift-gitops &> /dev/null; then
+        echo "  ℹ️  Application 'llmops-production' already exists, updating..."
+        oc apply -f "$ARGOCD_APPS_DIR/production-application.yaml"
+        echo "  ✅ Production application updated"
+    else
+        oc apply -f "$ARGOCD_APPS_DIR/production-application.yaml"
+        echo "  ✅ Production application created"
+    fi
 else
     echo "❌ Error: production-application.yaml not found"
     exit 1
@@ -74,7 +92,7 @@ echo "=========================================="
 echo "ArgoCD Applications Status"
 echo "=========================================="
 echo ""
-oc get applications -n openshift-gitops
+oc get applications.argoproj.io -n openshift-gitops
 echo ""
 
 # Get ArgoCD route
@@ -90,7 +108,7 @@ echo "🌐 View in ArgoCD UI:"
 echo "   https://$ARGOCD_ROUTE"
 echo ""
 echo "📊 Monitor sync status:"
-echo "   oc get applications -n openshift-gitops -w"
+echo "   oc get applications.argoproj.io -n openshift-gitops -w"
 echo ""
 echo "🔄 Dev environment will auto-sync when you push changes to Git"
 echo "🔄 Staging and Production require manual sync via ArgoCD UI or CLI"
