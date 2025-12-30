@@ -12,12 +12,13 @@ This guide walks you through setting up a production-ready LLMOps workflow using
 4. [Set Up OpenShift Namespaces](#step-4-set-up-openshift-namespaces)
 5. [Configure GitHub Repository](#step-5-configure-github-repository)
 6. [Deploy ArgoCD Applications](#step-6-deploy-argocd-applications)
-7. [Test GitOps Workflow - Dev Environment](#step-7-test-gitops-workflow---dev-environment)
-8. [Adjust ArgoCD Polling Interval (Optional)](#step-8-adjust-argocd-polling-interval-optional)
-9. [Test Manual Sync - Staging Environment](#step-9-test-manual-sync---staging-environment)
-10. [Production Deployment Workflow](#step-10-production-deployment-workflow)
-11. [Monitor with ArgoCD Dashboard](#step-11-monitor-with-argocd-dashboard)
-12. [Troubleshooting](#troubleshooting)
+7. [Configure Custom Health Checks for KServe](#step-7-configure-custom-health-checks-for-kserve)
+8. [Test GitOps Workflow - Dev Environment](#step-8-test-gitops-workflow---dev-environment)
+9. [Adjust ArgoCD Polling Interval (Optional)](#step-9-adjust-argocd-polling-interval-optional)
+10. [Test Manual Sync - Staging Environment](#step-10-test-manual-sync---staging-environment)
+11. [Production Deployment Workflow](#step-11-production-deployment-workflow)
+12. [Monitor with ArgoCD Dashboard](#step-12-monitor-with-argocd-dashboard)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -671,7 +672,7 @@ oc apply -f argocd-apps/staging-application.yaml
 oc apply -f argocd-apps/production-application.yaml
 
 # Verify applications were created
-oc get applications -n openshift-gitops
+oc get applications.argoproj.io -n openshift-gitops
 ```
 
 ### 6.3 View Applications in ArgoCD UI
@@ -688,11 +689,147 @@ oc get applications -n openshift-gitops
 
 ---
 
-## Step 7: Test GitOps Workflow - Dev Environment
+## Step 7: Configure Custom Health Checks for KServe
+
+By default, ArgoCD will show InferenceService resources as "Progressing" even when they are fully ready. This is because ArgoCD doesn't have built-in health checks for KServe's custom resources.
+
+### 7.1 Why This Is Important
+
+Without custom health checks:
+- ArgoCD shows "Progressing" status indefinitely
+- You can't tell if deployments actually succeeded
+- Difficult to use ArgoCD's health-based features
+- Manual verification required for every deployment
+
+With custom health checks:
+- Accurate health status (Healthy/Degraded/Progressing)
+- Clear visibility in ArgoCD UI
+- Better monitoring and alerting
+- Proper status for sync decisions
+
+### 7.2 Apply Custom Health Checks
+
+Run the automated setup script:
+
+```bash
+# Navigate to the health check directory
+cd llmops-via-argocd/argocd-custom-healthcheck
+
+# Make the scripts executable
+chmod +x apply-health-check-via-cr.sh verify-health-check.sh
+
+# Run the setup script
+./apply-health-check-via-cr.sh
+```
+
+**What this script does:**
+1. Configures health checks in the ArgoCD Custom Resource (CR)
+2. Waits for the ArgoCD operator to propagate changes to the ConfigMap
+3. Verifies the health check is applied
+4. Forces a refresh of all ArgoCD applications
+5. Shows the updated application status
+
+**Expected output:**
+```
+==========================================
+Applying Custom Health Checks to ArgoCD CR
+==========================================
+
+Step 1: Checking if ArgoCD CR exists...
+✓ ArgoCD CR found
+
+Step 2: Applying health check configuration to ArgoCD CR...
+✓ Health check configuration applied to ArgoCD CR
+
+Step 3: Waiting for operator to reconcile (10 seconds)...
+
+Step 4: Verifying health check is in ConfigMap...
+✓ Health check successfully added to ConfigMap
+
+Step 5: Forcing hard refresh on ArgoCD applications...
+✓ Applications refreshed
+
+Step 6: Waiting for health status to update (30 seconds)...
+
+==========================================
+Current Application Status:
+==========================================
+NAME                SYNC STATUS   HEALTH STATUS
+llmops-dev          Synced        Healthy
+llmops-staging      Synced        Healthy
+llmops-production   OutOfSync     Missing
+```
+
+### 7.3 Verify the Configuration
+
+Run the verification script to confirm everything is working:
+
+```bash
+# Run the verification script
+./verify-health-check.sh
+```
+
+**Expected output:**
+```
+==========================================
+Verifying ArgoCD Health Check Configuration
+==========================================
+
+Step 1: Checking if health check is in ArgoCD CR...
+✓ resourceHealthChecks found in ArgoCD CR
+✓ InferenceService health check found in ArgoCD CR
+
+Step 2: Checking if health check propagated to ConfigMap...
+✓ Health check successfully propagated to ConfigMap
+
+Step 3: Checking ArgoCD application health status...
+
+NAME                SYNC STATUS   HEALTH STATUS
+llmops-dev          Synced        Healthy
+llmops-staging      Synced        Healthy
+llmops-production   OutOfSync     Missing
+```
+
+Applications should now show "Healthy" status when InferenceServices are ready.
+
+**Manual verification (alternative):**
+```bash
+# Check application status
+oc get applications.argoproj.io -n openshift-gitops
+
+# Check ArgoCD CR
+oc get argocd openshift-gitops -n openshift-gitops -o yaml | grep -A 10 "resourceHealthChecks"
+
+# Check ConfigMap
+oc get configmap argocd-cm -n openshift-gitops -o yaml | grep -A 5 "InferenceService"
+```
+
+### 7.4 Understanding the Solution
+
+The script configures health checks in the **ArgoCD Custom Resource** (not the ConfigMap directly):
+
+```yaml
+spec:
+  resourceHealthChecks:
+    - group: serving.kserve.io
+      kind: InferenceService
+      check: |
+        # Lua script that checks the Ready condition
+```
+
+The ArgoCD operator then automatically propagates this to the `argocd-cm` ConfigMap. This is the correct, operator-approved method that persists across operator reconciliation.
+
+**For detailed documentation:** See [argocd-custom-healthcheck/README.md](argocd-custom-healthcheck/README.md)
+
+**Quick reference:** See [argocd-custom-healthcheck/QUICKSTART.md](argocd-custom-healthcheck/QUICKSTART.md)
+
+---
+
+## Step 8: Test GitOps Workflow - Dev Environment
 
 The dev environment is configured with **auto-sync**, so it will automatically deploy when you push changes to Git.
 
-### 7.1 Trigger Initial Sync
+### 8.1 Trigger Initial Sync
 
 Since this is the first deployment, ArgoCD detected the resources but hasn't synced yet. Let's trigger the initial sync:
 
@@ -713,7 +850,7 @@ oc patch application llmops-dev -n openshift-gitops \
 argocd app sync llmops-dev
 ```
 
-### 7.2 Monitor Deployment Progress
+### 8.2 Monitor Deployment Progress
 
 **Via ArgoCD UI:**
 - The application view shows a tree of resources
@@ -732,7 +869,7 @@ oc get inferenceservice -n llmops-dev -w
 oc get pods -n llmops-dev
 ```
 
-### 7.3 Verify Deployment
+### 8.3 Verify Deployment
 
 ```bash
 # Check InferenceService status
@@ -755,7 +892,7 @@ NAME                      READY   URL
 dev-qwen25-05b-instruct   True    https://dev-qwen25-05b-instruct-llmops-dev.apps...
 ```
 
-### 7.4 Test Auto-Sync with a Change
+### 8.4 Test Auto-Sync with a Change
 
 Now let's test the auto-sync feature by making a change:
 
@@ -798,7 +935,7 @@ Within 3 minutes (default polling interval), ArgoCD will:
 **Monitor via CLI:**
 ```bash
 # Watch application status
-oc get application llmops-dev -n openshift-gitops -w
+oc get applications.argoproj.io llmops-dev -n openshift-gitops -w
 
 # Watch InferenceService
 oc describe inferenceservice dev-qwen25-05b-instruct -n llmops-dev | grep "display-name"
@@ -809,7 +946,7 @@ oc describe inferenceservice dev-qwen25-05b-instruct -n llmops-dev | grep "displ
 
 ---
 
-## Step 8: Adjust ArgoCD Polling Interval (Optional)
+## Step 9: Adjust ArgoCD Polling Interval (Optional)
 
 By default, ArgoCD polls Git repositories every **3 minutes**. You can change this to sync faster or slower.
 
@@ -921,11 +1058,11 @@ argocd app sync llmops-dev
 
 ---
 
-## Step 9: Test Manual Sync - Staging Environment
+## Step 10: Test Manual Sync - Staging Environment
 
 Staging and production environments require **manual approval** before syncing.
 
-### 9.1 Make Changes to Staging Overlay
+### 10.1 Make Changes to Staging Overlay
 
 ```bash
 # Create feature branch for staging
@@ -950,7 +1087,7 @@ git push -u origin feature/deploy-to-staging
 
 **Create and merge Pull Request on GitHub**
 
-### 9.2 ArgoCD Detects Change but Doesn't Auto-Deploy
+### 10.2 ArgoCD Detects Change but Doesn't Auto-Deploy
 
 After merging to main:
 
@@ -970,7 +1107,7 @@ oc get application llmops-staging -n openshift-gitops
 
 This is the key difference - **manual approval required**.
 
-### 9.3 Review Changes in ArgoCD UI
+### 10.3 Review Changes in ArgoCD UI
 
 1. Click on **llmops-staging** application
 2. Click **"APP DIFF"** button to see what changed
@@ -978,7 +1115,7 @@ This is the key difference - **manual approval required**.
    - CPU limit changed from "3" to "4"
 4. This gives you a chance to review before deploying
 
-### 9.4 Manually Sync Staging
+### 10.4 Manually Sync Staging
 
 **Via ArgoCD UI:**
 1. Click **"SYNC"** button
@@ -997,7 +1134,7 @@ oc patch application llmops-staging -n openshift-gitops \
   --patch '{"operation": {"initiatedBy": {"username": "admin"}, "sync": {}}}'
 ```
 
-### 9.5 Verify Staging Deployment
+### 10.5 Verify Staging Deployment
 
 ```bash
 # Check InferenceService
@@ -1013,11 +1150,11 @@ oc get route staging-qwen25-05b-instruct -n llmops-staging
 
 ---
 
-## Step 10: Production Deployment Workflow
+## Step 11: Production Deployment Workflow
 
 Production follows the same manual sync pattern as staging, but with additional safeguards.
 
-### 10.1 Progressive Rollout Pattern
+### 11.1 Progressive Rollout Pattern
 
 **Recommended workflow:**
 ```
@@ -1044,7 +1181,7 @@ Production follows the same manual sync pattern as staging, but with additional 
    └─ Monitor production deployment
 ```
 
-### 10.2 Deploy to Production
+### 11.2 Deploy to Production
 
 ```bash
 # Create production branch
@@ -1074,7 +1211,7 @@ git push -u origin feature/production-release-v1
 3. Add production deployment checklist
 4. After approval, merge to main
 
-### 10.3 Review Production Changes in ArgoCD
+### 11.3 Review Production Changes in ArgoCD
 
 1. Open ArgoCD UI
 2. Go to **llmops-production** application
@@ -1083,7 +1220,7 @@ git push -u origin feature/production-release-v1
 5. Verify the changes are correct
 6. Check that staging validation passed
 
-### 10.4 Manually Sync Production
+### 11.4 Manually Sync Production
 
 **Via ArgoCD UI:**
 1. Click **"SYNC"** button
@@ -1100,7 +1237,7 @@ argocd app sync llmops-production
 oc get inferenceservice -n llmops-prod -w
 ```
 
-### 10.5 Verify Production Deployment
+### 11.5 Verify Production Deployment
 
 ```bash
 # Check InferenceService status
@@ -1117,7 +1254,7 @@ curl https://$PROD_URL/v1/models
 watch -n 10 'oc get inferenceservice -n llmops-prod'
 ```
 
-### 10.6 Rollback Procedure (if needed)
+### 11.6 Rollback Procedure (if needed)
 
 If something goes wrong in production:
 
@@ -1148,9 +1285,9 @@ git push -u origin hotfix/rollback-production
 
 ---
 
-## Step 11: Monitor with ArgoCD Dashboard
+## Step 12: Monitor with ArgoCD Dashboard
 
-### 11.1 ArgoCD Dashboard Overview
+### 12.1 ArgoCD Dashboard Overview
 
 **Access the dashboard:**
 ```bash
@@ -1164,7 +1301,7 @@ oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.hos
 - **Health Status:** Healthy, Progressing, Degraded, Missing
 - **Last Sync:** Timestamp of last successful sync
 
-### 11.2 Application Details View
+### 12.2 Application Details View
 
 Click on any application to see:
 
@@ -1184,7 +1321,7 @@ Click on any application to see:
 - Errors and warnings
 - Resource changes
 
-### 11.3 Monitoring Sync Status
+### 12.3 Monitoring Sync Status
 
 **Via ArgoCD UI:**
 1. Main dashboard shows all applications at a glance
@@ -1204,7 +1341,7 @@ oc get applications -n openshift-gitops -w
 oc describe application llmops-dev -n openshift-gitops
 ```
 
-### 11.4 View Application Diff
+### 12.4 View Application Diff
 
 Before syncing, always review what changed:
 
@@ -1220,7 +1357,7 @@ Before syncing, always review what changed:
 argocd app diff llmops-staging
 ```
 
-### 11.5 View Sync History
+### 12.5 View Sync History
 
 **Via ArgoCD UI:**
 1. Click on application
@@ -1232,7 +1369,7 @@ argocd app diff llmops-staging
    - Sync status
    - Option to rollback
 
-### 11.6 Monitor All Environments
+### 12.6 Monitor All Environments
 
 **Dashboard view:**
 ```bash
@@ -1259,7 +1396,7 @@ oc get inferenceservice --all-namespaces | grep llmops
 oc get route --all-namespaces | grep llmops
 ```
 
-### 11.7 Set Up Notifications (Optional)
+### 12.7 Set Up Notifications (Optional)
 
 ArgoCD can send notifications on sync events:
 
@@ -1367,7 +1504,38 @@ oc logs $POD -n llmops-dev
 # - Configuration errors
 ```
 
-### Issue 4: Auto-Sync Not Working for Dev Environment
+### Issue 4: Application Shows "Progressing" Instead of "Healthy"
+
+**Problem:** ArgoCD shows InferenceService as "Progressing" even when `READY: True`.
+
+**Cause:** ArgoCD doesn't have built-in health checks for KServe's InferenceService custom resource. By default, it looks at all status conditions, including `Stopped: False`, which causes it to report "Progressing" indefinitely.
+
+**Solution:** Configure custom health checks in the ArgoCD CR.
+
+```bash
+# Run the automated health check setup script
+cd llmops-via-argocd/argocd-custom-healthcheck
+chmod +x apply-health-check-via-cr.sh
+./apply-health-check-via-cr.sh
+
+# Verify the fix
+./verify-health-check.sh
+
+# Check application status
+oc get applications.argoproj.io -n openshift-gitops
+```
+
+**Expected result:** Applications should now show "Healthy" status when InferenceService is ready.
+
+**For detailed documentation:** See `llmops-via-argocd/argocd-custom-healthcheck/README.md`
+
+**Why this works:**
+- Configures health checks in the ArgoCD CR (`spec.resourceHealthChecks`)
+- ArgoCD operator automatically propagates to the ConfigMap
+- Changes persist across operator reconciliation
+- This is the correct, operator-approved method
+
+### Issue 5: Auto-Sync Not Working for Dev Environment
 
 **Problem:** Pushed changes to Git but dev environment didn't auto-sync.
 
@@ -1397,7 +1565,7 @@ argocd app sync llmops-dev
 oc logs -n openshift-gitops deployment/openshift-gitops-repo-server
 ```
 
-### Issue 5: Sync Fails with "PermissionDenied" Error
+### Issue 6: Sync Fails with "PermissionDenied" Error
 
 **Problem:** ArgoCD cannot create resources in target namespace.
 
@@ -1420,7 +1588,7 @@ oc create rolebinding argocd-admin \
   -n llmops-dev
 ```
 
-### Issue 6: Kustomize Build Fails
+### Issue 7: Kustomize Build Fails
 
 **Problem:** ArgoCD shows "ComparisonError: kustomize build failed".
 
@@ -1445,7 +1613,7 @@ ls -la deploy_model/base/
 oc kustomize deploy_model/overlays/dev/
 ```
 
-### Issue 7: Cannot Access ArgoCD Dashboard
+### Issue 8: Cannot Access ArgoCD Dashboard
 
 **Problem:** ArgoCD route returns 404 or connection refused.
 
@@ -1466,7 +1634,7 @@ oc describe route openshift-gitops-server -n openshift-gitops
 oc delete pod -n openshift-operators -l name=openshift-gitops-operator
 ```
 
-### Issue 8: Forgot ArgoCD Admin Password
+### Issue 9: Forgot ArgoCD Admin Password
 
 **Solution:**
 
@@ -1484,7 +1652,7 @@ oc get secret openshift-gitops-cluster -n openshift-gitops \
   -o jsonpath='{.data.admin\.password}' | base64 -d
 ```
 
-### Issue 9: GPU Not Available
+### Issue 10: GPU Not Available
 
 **Problem:** Pod is pending with "Insufficient nvidia.com/gpu".
 
@@ -1511,7 +1679,7 @@ git push
 # ArgoCD will auto-sync (dev) or show OutOfSync (staging/prod)
 ```
 
-### Issue 10: Want to Disable Auto-Sync for Dev
+### Issue 11: Want to Disable Auto-Sync for Dev
 
 **Problem:** Need to test changes in dev before auto-deploying.
 
