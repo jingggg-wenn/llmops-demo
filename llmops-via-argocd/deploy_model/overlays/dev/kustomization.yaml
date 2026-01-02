@@ -16,7 +16,7 @@ patches:
     patch: |-
       - op: replace
         path: /metadata/annotations/openshift.io~1display-name
-        value: "qwen2.5-0.5b-dev-v5"
+        value: "qwen2.5-0.5b-dev-final"
       - op: add
         path: /metadata/annotations/serving.knative.dev~1revision-history-limit
         value: "3"
@@ -65,13 +65,4 @@ patches:
       - op: add
         path: /spec/containers/0/args/-
         value: "hermes"
-      - op: add
-        path: /spec/containers/0/args/-
-        value: "--speculative-config"
-      - op: add
-        path: /spec/containers/0/args/-
-        value: '{"draft_model":"Qwen/Qwen2.5-0.5B-Instruct","num_speculative_tokens":5}'
-      - op: add
-        path: /spec/containers/0/args/-
-        value: "--use-v2-block-manager"
 
