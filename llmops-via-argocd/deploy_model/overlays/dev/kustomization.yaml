@@ -45,3 +45,15 @@ patches:
         path: /spec/predictor/model/resources/requests/memory
         value: "4Gi"
 
+  # Patch ServingRuntime to change GPU memory utilization
+  - target:
+      kind: ServingRuntime
+      name: qwen25-05b-instruct
+    patch: |-
+      - op: add
+        path: /spec/containers/0/args/-
+        value: "--gpu-memory-utilization"
+      - op: add
+        path: /spec/containers/0/args/-
+        value: "0.75"
+
