@@ -49,6 +49,7 @@ llmops-via-argocd/
 ├── step-by-step-guide.md                 # Detailed setup guide (1900+ lines)
 ├── NAMESPACE-GUIDE.md                    # Namespace organization guide
 ├── COMPARISON-GITHUBACTIONS-ARGOCD.md    # GitHub Actions vs ArgoCD comparison
+├── vLLM_PARAMS_USAGE_SCENARIOS.md        # vLLM parameter testing scenarios
 └── FOLDER-STRUCTURE.md                   # This file
 ```
 
@@ -174,6 +175,15 @@ Scripts and documentation for configuring custom health checks for KServe Infere
 - Use case scenarios
 - Migration path
 - Recommendations
+
+**vLLM_PARAMS_USAGE_SCENARIOS.md** (vLLM parameter testing):
+- 3 distinct vLLM configuration scenarios
+- GPU memory utilization tuning
+- Tool use / function calling configuration
+- Max model length adjustment
+- Complete testing commands with curl and jq
+- Pod inspection commands
+- Troubleshooting guide
 
 ## Key Features
 
@@ -350,6 +360,7 @@ You'll know the implementation is successful when:
 - `step-by-step-guide.md` - Detailed setup guide
 - `NAMESPACE-GUIDE.md` - Namespace organization
 - `COMPARISON-GITHUBACTIONS-ARGOCD.md` - Comparison with GitHub Actions
+- `vLLM_PARAMS_USAGE_SCENARIOS.md` - vLLM parameter testing scenarios
 - `FOLDER-STRUCTURE.md` - This file
 
 ### Setup Scripts

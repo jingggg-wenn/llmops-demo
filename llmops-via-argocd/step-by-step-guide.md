@@ -896,6 +896,12 @@ NAME                      READY   URL
 dev-qwen25-05b-instruct   True    https://dev-qwen25-05b-instruct-llmops-dev.apps...
 ```
 
+**For advanced testing and vLLM parameter experimentation:** See [vLLM_PARAMS_USAGE_SCENARIOS.md](./vLLM_PARAMS_USAGE_SCENARIOS.md) for detailed testing scenarios including:
+- GPU memory utilization testing
+- Tool use / function calling
+- Max model length configuration
+- Complete curl commands with `jq` formatting
+
 ### 8.4 Test Auto-Sync with a Change
 
 Now let's test the auto-sync feature by making a change:
@@ -1151,6 +1157,8 @@ oc describe inferenceservice staging-qwen25-05b-instruct -n llmops-staging | gre
 # Check route
 oc get route staging-qwen25-05b-instruct -n llmops-staging
 ```
+
+**For testing vLLM parameter changes in staging:** See [vLLM_PARAMS_USAGE_SCENARIOS.md](./vLLM_PARAMS_USAGE_SCENARIOS.md) for practical scenarios like GPU utilization tuning, enabling tool use, and adjusting max model length.
 
 ---
 
@@ -1911,6 +1919,7 @@ Use this checklist to verify your GitOps setup is complete:
 - [README.md](./README.md) - Project overview
 - [FOLDER-STRUCTURE.md](./FOLDER-STRUCTURE.md) - Folder structure and file contents
 - [NAMESPACE-GUIDE.md](./NAMESPACE-GUIDE.md) - Namespace organization and troubleshooting
+- [vLLM_PARAMS_USAGE_SCENARIOS.md](./vLLM_PARAMS_USAGE_SCENARIOS.md) - vLLM parameter testing scenarios
 - [setup-argocd.sh](./setup_scripts/setup-argocd.sh) - Automated setup script
 - [apply-argocd-apps.sh](./setup_scripts/apply-argocd-apps.sh) - Apply ArgoCD applications
 

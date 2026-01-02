@@ -118,6 +118,8 @@ git push -u origin feature/dev-changes
 oc get application llmops-dev -n openshift-gitops -w
 ```
 
+**For testing vLLM parameter changes:** See [vLLM_PARAMS_USAGE_SCENARIOS.md](./vLLM_PARAMS_USAGE_SCENARIOS.md) for detailed scenarios including GPU utilization, tool use, and max model length configuration.
+
 ### Deploy to Staging (Manual Sync)
 
 ```bash
@@ -141,6 +143,8 @@ git push -u origin feature/staging-changes
 # 3. Click SYNC to deploy
 # 4. Monitor deployment progress
 ```
+
+**For testing different vLLM configurations:** See [vLLM_PARAMS_USAGE_SCENARIOS.md](./vLLM_PARAMS_USAGE_SCENARIOS.md) for 3 practical scenarios with testing commands.
 
 ### Deploy to Production (Manual Sync with Review)
 
