@@ -4,10 +4,12 @@ metadata:
   annotations:
     openshift.io/display-name: qwen2.5-0.5b-instruct
     serving.kserve.io/deploymentMode: RawDeployment
+    opendatahub.io/model-type: generative
   name: qwen25-05b-instruct
   labels:
     opendatahub.io/dashboard: 'true'
     networking.kserve.io/visibility: exposed
+    opendatahub.io/genai-asset: 'true'
 spec:
   predictor:
     maxReplicas: 1
