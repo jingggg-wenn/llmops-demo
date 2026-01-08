@@ -4,11 +4,13 @@ metadata:
   annotations:
     openshift.io/display-name: qwen2.5-0.5b-instruct
     serving.kserve.io/deploymentMode: RawDeployment
+    # REQUIRED for OpenShift AI UI and Playground compatibility
     opendatahub.io/model-type: generative
   name: qwen25-05b-instruct
   labels:
     opendatahub.io/dashboard: 'true'
     networking.kserve.io/visibility: exposed
+    # REQUIRED for OpenShift AI Playground - marks this as a GenAI asset
     opendatahub.io/genai-asset: 'true'
 spec:
   predictor:
