@@ -2,6 +2,8 @@ apiVersion: serving.kserve.io/v1alpha1
 kind: ServingRuntime
 metadata:
   annotations:
+    # ArgoCD sync wave - create ServingRuntime FIRST (before InferenceService)
+    argocd.argoproj.io/sync-wave: "0"
     opendatahub.io/apiProtocol: REST
     opendatahub.io/recommended-accelerators: '["nvidia.com/gpu"]'
     opendatahub.io/template-display-name: vLLM ServingRuntime for KServe
