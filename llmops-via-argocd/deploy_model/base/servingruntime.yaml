@@ -7,6 +7,9 @@ metadata:
     opendatahub.io/template-display-name: vLLM ServingRuntime for KServe
     opendatahub.io/template-name: vllm-runtime
     openshift.io/display-name: qwen2.5-0.5b-instruct
+    # NOTE: The following annotations are UI-managed and NOT required for YAML deployments:
+    # - opendatahub.io/runtime-version: Set by UI (e.g., v0.9.1.0)
+    # - opendatahub.io/serving-runtime-scope: Set by UI (e.g., global)
   name: qwen25-05b-instruct
   labels:
     opendatahub.io/dashboard: 'true'

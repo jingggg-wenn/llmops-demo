@@ -6,6 +6,12 @@ metadata:
     serving.kserve.io/deploymentMode: RawDeployment
     # REQUIRED for OpenShift AI UI and Playground compatibility
     opendatahub.io/model-type: generative
+    # NOTE: The following annotations are UI-managed and NOT required for YAML deployments:
+    # - opendatahub.io/connections: Set by UI for data connections
+    # - opendatahub.io/hardware-profile-name: Set by UI for hardware profiles
+    # - opendatahub.io/hardware-profile-namespace: Set by UI
+    # - security.opendatahub.io/enable-auth: Optional auth setting
+    # - serving.kserve.io/stop: Runtime state management
   name: qwen25-05b-instruct
   labels:
     opendatahub.io/dashboard: 'true'
