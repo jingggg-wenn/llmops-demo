@@ -27,7 +27,7 @@ spec:
     model:
       modelFormat:
         name: vLLM
-      name: 'qwen25-05b-instruct'
+      name: ''
       resources:
         limits:
           cpu: '2'
