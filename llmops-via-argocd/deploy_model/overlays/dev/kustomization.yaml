@@ -16,7 +16,7 @@ patches:
     patch: |-
       - op: replace
         path: /metadata/annotations/openshift.io~1display-name
-        value: "qwen2.5-0.5b-de-patch"
+        value: "qwen2.5-0.5b-dev"
       - op: add
         path: /metadata/annotations/serving.knative.dev~1revision-history-limit
         value: "3"
@@ -44,26 +44,3 @@ patches:
       - op: replace
         path: /spec/predictor/model/resources/requests/memory
         value: "4Gi"
- # Patch ServingRuntime to change change max model len, GPU memory utilization, enable tool call
-  - target:
-      kind: ServingRuntime
-      name: qwen25-05b-instruct
-    patch: |-
-      - op: replace
-        path: /spec/containers/0/args/4
-        value: "12000"
-      - op: add
-        path: /spec/containers/0/args/-
-        value: "--gpu-memory-utilization"
-      - op: add
-        path: /spec/containers/0/args/-
-        value: "0.75"
-      - op: add
-        path: /spec/containers/0/args/-
-        value: "--enable-auto-tool-choice"
-      - op: add
-        path: /spec/containers/0/args/-
-        value: "--tool-call-parser"
-      - op: add
-        path: /spec/containers/0/args/-
-        value: "hermes"
