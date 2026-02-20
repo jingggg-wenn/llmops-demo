@@ -86,13 +86,19 @@ echo "✅ ArgoCD Server is ready"
 echo ""
 
 # Create namespaces
-echo "Creating namespaces..."
+echo "Creating namespaces with OpenShift AI integration..."
 for NS in llmops-dev llmops-staging llmops-prod; do
     if oc get namespace $NS &> /dev/null; then
         echo "  ℹ️  Namespace $NS already exists"
+        # Ensure it has the OpenShift AI label
+        oc label namespace $NS opendatahub.io/dashboard=true --overwrite &> /dev/null
+        oc annotate namespace $NS openshift.io/display-name="$NS" --overwrite &> /dev/null
+        echo "  ✅ Updated namespace $NS with OpenShift AI labels"
     else
         oc create namespace $NS
-        echo "  ✅ Created namespace: $NS"
+        oc label namespace $NS opendatahub.io/dashboard=true
+        oc annotate namespace $NS openshift.io/display-name="$NS"
+        echo "  ✅ Created namespace: $NS (with OpenShift AI integration)"
     fi
 done
 echo ""

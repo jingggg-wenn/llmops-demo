@@ -313,6 +313,7 @@ chmod +x setup-argocd.sh
 **What this script does:**
 - Verifies OpenShift GitOps Operator is installed
 - Creates three namespaces: `llmops-dev`, `llmops-staging`, `llmops-prod`
+- Adds OpenShift AI dashboard integration (`opendatahub.io/dashboard=true` label)
 - Grants ArgoCD service account admin permissions to manage these namespaces
 - Retrieves ArgoCD Server URL and admin password
 
@@ -345,10 +346,18 @@ Setup Complete!
 If you prefer manual setup:
 
 ```bash
-# Create three namespaces
+# Create three namespaces with OpenShift AI integration
 oc create namespace llmops-dev
+oc label namespace llmops-dev opendatahub.io/dashboard=true
+oc annotate namespace llmops-dev openshift.io/display-name="llmops-dev"
+
 oc create namespace llmops-staging
+oc label namespace llmops-staging opendatahub.io/dashboard=true
+oc annotate namespace llmops-staging openshift.io/display-name="llmops-staging"
+
 oc create namespace llmops-prod
+oc label namespace llmops-prod opendatahub.io/dashboard=true
+oc annotate namespace llmops-prod openshift.io/display-name="llmops-prod"
 
 # Grant ArgoCD permissions to manage these namespaces
 ARGOCD_SA="openshift-gitops-argocd-application-controller"
@@ -361,11 +370,60 @@ for NS in llmops-dev llmops-staging llmops-prod; do
 done
 ```
 
+**Alternative: Create namespaces using YAML manifests**
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llmops-dev
+  labels:
+    opendatahub.io/dashboard: "true"
+    kubernetes.io/metadata.name: llmops-dev
+  annotations:
+    openshift.io/display-name: "llmops-dev"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llmops-staging
+  labels:
+    opendatahub.io/dashboard: "true"
+    kubernetes.io/metadata.name: llmops-staging
+  annotations:
+    openshift.io/display-name: "llmops-staging"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llmops-prod
+  labels:
+    opendatahub.io/dashboard: "true"
+    kubernetes.io/metadata.name: llmops-prod
+  annotations:
+    openshift.io/display-name: "llmops-prod"
+```
+
+Apply with: `oc apply -f namespaces.yaml`
+
+**Why add `opendatahub.io/dashboard=true`?**
+
+This label integrates the namespace with the OpenShift AI Dashboard, enabling:
+- Namespace appears in Data Science Projects view
+- Model serving capabilities via KServe
+- Workbench creation for Jupyter notebooks
+- Pipeline execution
+- Hardware profile selection for GPU targeting
+
 ### 4.3 Verify Namespace Setup
 
 ```bash
 # List all three namespaces
 oc get namespace | grep llmops
+
+# Verify OpenShift AI integration
+oc get namespaces llmops-dev llmops-staging llmops-prod \
+  -o custom-columns=NAME:.metadata.name,AI-DASHBOARD:.metadata.labels.opendatahub\\.io/dashboard
 
 # Verify ArgoCD has permissions
 for NS in llmops-dev llmops-staging llmops-prod; do
