@@ -49,21 +49,21 @@ patches:
       name: qwen25-05b-instruct
     patch: |-
       - op: replace
-      path: /spec/containers/0/args/4
-      value: "12000"
+        path: /spec/containers/0/args/4
+        value: "12000"
       - op: add
-      path: /spec/containers/0/args/-
-      value: "--gpu-memory-utilization"
+        path: /spec/containers/0/args/-
+        value: "--gpu-memory-utilization"
       - op: add
-      path: /spec/containers/0/args/-
-      value: "0.75"
+        path: /spec/containers/0/args/-
+        value: "0.75"
       - op: add
-      path: /spec/containers/0/args/-
-      value: "--enable-auto-tool-choice"
+        path: /spec/containers/0/args/-
+        value: "--enable-auto-tool-choice"
       - op: add
-      path: /spec/containers/0/args/-
-      value: "--tool-call-parser"
+        path: /spec/containers/0/args/-
+        value: "--tool-call-parser"
       - op: add
-      path: /spec/containers/0/args/-
-      value: "hermes"
+        path: /spec/containers/0/args/-
+        value: "hermes"
 
