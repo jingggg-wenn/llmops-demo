@@ -5,7 +5,8 @@ metadata:
     # ArgoCD sync wave - create InferenceService AFTER ServingRuntime
     argocd.argoproj.io/sync-wave: "1"
     openshift.io/display-name: qwen2.5-0.5b-instruct
-    serving.kserve.io/deploymentMode: RawDeployment
+    serving.kserve.io/deploymentMode: Standard
+    modelFormat: vLLM
     # REQUIRED for OpenShift AI UI and Playground compatibility
     opendatahub.io/model-type: generative
     # NOTE: The following annotations are UI-managed and NOT required for YAML deployments:
